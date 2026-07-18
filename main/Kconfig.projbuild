@@ -1,0 +1,145 @@
+menu "FuckerDetector config"
+
+    choice APP_FIRMWARE_TYPE
+        prompt "Firmware type"
+        default APP_SERVER
+            
+        config APP_SERVER
+            bool "Server"
+                
+        config APP_CLIENT
+            bool "Client"
+    
+    endchoice
+
+    menu "General config"
+        choice APP_VER_TYPE
+            prompt "Version type"
+            default APP_VER_TYPE_RELEASE
+
+            config APP_VER_TYPE_DEV
+                bool "Dev"
+
+            config APP_VER_TYPE_SNAPSHOT
+                bool "Snapshot"
+            
+            config APP_VER_TYPE_RELEASE
+                bool "Release"
+                
+        endchoice
+
+        menu "BLE"
+            config APP_GENERAL_BLE_COMPANY_ID
+                hex "Advertising company_id field value"
+                range 0x0000 0xFFFF
+                default 0xFF64
+
+            config APP_GENERAL_BLE_PROTOCOL_VER
+                hex "BLE protocol version"
+                range 0x0000 0xFFFF
+                default 0xCC01
+
+            config APP_GENERAL_ADV_ITVL_MAX
+                int "Max advertising interval (ms)"
+                range 20 10240
+                default 128
+
+            config APP_GENERAL_ADV_ITVL_MIN
+                int "Min advertising interval (ms)"
+                range 20 10240
+                default 32
+
+            config APP_GENERAL_SCAN_ITVL
+                int "Scan interval (ms)"
+                range 20 10240
+                default 96
+
+            config APP_GENERAL_SCAN_WINDOW
+                int "Scan window time (ms)"
+                range 20 10240
+                default 48
+        endmenu
+
+        menu "CLI"
+            config APP_GENERAL_CLI_ENABLED
+                bool "Enable cli"
+                default y
+
+            config APP_GENERAL_CLI_MAX_CMD_LEN
+                int "Max command length"
+                range 8 255
+                default 32
+                depends on APP_GENERAL_CLI_ENABLED
+                
+            config APP_GENERAL_CLI_MAX_ARG_COUNT
+                int "Max arguments count"
+                range 1 63
+                default 4
+                depends on APP_GENERAL_CLI_ENABLED
+
+            config APP_GENERAL_CLI_MAX_ARG_LEN
+                int "Max argument length"
+                range 8 255
+                default 16
+                depends on APP_GENERAL_CLI_ENABLED
+
+            config APP_GENERAL_CLI_MAX_CMD_COUNT
+                int "Max command count"
+                range 4 64
+                default 16
+        endmenu
+
+    endmenu
+
+    menu "Client config"
+
+        config APP_CLIENT_I2C_SPEED
+            int "I2C bus speed (KHz)"
+            range 10 400
+            default 100
+
+        config APP_CLIENT_BLE_NAME
+            string "Advertising name (length <= 16 char)"
+            default "cliV2"
+
+        config APP_CLIENT_RESPONSE_ENABLED
+            bool "Enable alarm response"
+            default n
+
+        config APP_CLIENT_ADV_DURATION
+            int "Client advertising duration (ms)"
+            range 500 60000
+            default 3000
+
+    endmenu
+
+    menu "Server config"
+
+        config APP_SERVER_I2C_SPEED
+            int "I2C bus speed (KHz)"
+            range 10 400
+            default 100
+
+        config APP_SERVER_BLE_NAME
+            string "Advertising name (length <= 16 char)"
+            default "srvV2"
+
+        choice APP_SERVER_RTC_TYPE
+            prompt "Server RTC type"
+            default APP_SERVER_RTC_DS3231
+
+            config APP_SERVER_RTC_DISABLED
+                bool "Disabled"
+
+            config APP_SERVER_RTC_DS3231
+                bool "DS3231"
+        endchoice
+
+        config APP_SERVER_ADV_DURATION
+            int "Server advertising duration (ms)"
+            range 500 60000
+            default 5000
+
+    endmenu
+
+endmenu

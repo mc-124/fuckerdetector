@@ -1,0 +1,11 @@
+sdkconfig.old
+.vscode/
+.cache/
+build/
+managed_components/
+ccflags.txt
+.clangd
+*.lock
+search_incpath.py
+parseccflags.py
+.codeignore
