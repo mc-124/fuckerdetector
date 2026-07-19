@@ -228,14 +228,19 @@ void start_scan(uint32_t scan_time){
         NULL
     );
     if (ret){
-        ESP_LOGE(TAG, "ble_gap_ext_disc -> %d", ret);
+        ESP_LOGE(TAG, "cannot start scan: %d", ret);
         ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
     ESP_LOGI(TAG, "scanning");
 }
 
 void stop_scan(){
-    /// @todo
+    esp_err_t ret = ble_gap_disc_cancel();
+    if (ret){
+        ESP_LOGE(TAG, "cannot stop scan: %d", ret);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    }
+    ESP_LOGI(TAG, "scan stopped");
 }
 
 bool iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result){

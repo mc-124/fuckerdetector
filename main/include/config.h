@@ -77,6 +77,9 @@ static_assert(
     );
 #endif // CONFIG_APP_GENERAL_CLI_ENABLED
 
+static_assert(500<=CONFIG_APP_SERVER_ADV_DURATION&&CONFIG_APP_SERVER_ADV_DURATION<=60000, "invalid server adv duration");
+static_assert(500<=CONFIG_APP_CLIENT_ADV_DURATION&&CONFIG_APP_CLIENT_ADV_DURATION<=60000, "invalid client adv duration");
+
 #define FIRMWARE_VERSION CONFIG_APP_PROJECT_VER
 
 #ifndef CONFIG_APP_SERVER_RTC_DISABLED
@@ -88,7 +91,7 @@ static_assert(
 #endif /* CONFIG_APP_SERVER_RTC_DS3231 */
 
 // ADC 读取电池 1/2 分压后电压
-#define CHAN_VBAT    ADC_CHANNEL_1
+#define CHAN_VBAT   ADC_CHANNEL_1
 
 #define PIN_FUNCT   0   /* 唤醒/按钮 */
 #define PIN_PERI_RX 3

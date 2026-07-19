@@ -106,6 +106,12 @@ menu "FuckerDetector config"
             bool "Enable alarm response"
             default n
 
+        config APP_CLIENT_RESPONSE_SCAN_DURATION
+            int "Scan response duration"
+            range 500 60000
+            default 2000
+            depends on APP_CLIENT_RESPONSE_ENABLED
+
         config APP_CLIENT_ADV_DURATION
             int "Client advertising duration (ms)"
             range 500 60000
