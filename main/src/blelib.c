@@ -1,4 +1,4 @@
-#include "bluetooth.h"
+#include "blelib.h"
 
 #include "error.h"
 #include "misc.h"
@@ -20,7 +20,7 @@
 
 #define ADV_INSTANCE 0
 
-static const char *TAG = "BT";
+static const char *TAG = "blelib";
 //static QueueHandle_t ble_op_queue = NULL;
 static uint8_t own_addr_type = 0;
 static uint8_t addr_val[6] = {0};
@@ -152,8 +152,8 @@ void start_advertising(struct AdvManfacturerData *data, uint32_t adv_time){
     params.primary_phy = BLE_HCI_LE_PHY_CODED;
     params.secondary_phy = BLE_HCI_LE_PHY_CODED;
     params.sid = 2;
-    params.itvl_max = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_GENERAL_ADV_ITVL_MAX);
-    params.itvl_min = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_GENERAL_ADV_ITVL_MIN);
+    params.itvl_max = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_ADV_ITVL_MAX);
+    params.itvl_min = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_ADV_ITVL_MIN);
     params.tx_power = ESP_PWR_LVL_P20; // +20dbm
     esp_err_t ret = ble_gap_ext_adv_configure(ADV_INSTANCE, &params, NULL, event_callback, NULL);
     if (ret){
@@ -200,6 +200,8 @@ void stop_advertising(){
     }
 }
 
+#if CONFIG_APP_CLIENT
+
 void set_scan_callback(const ScanDiscCallbackFuncPtr func){
     if (!func){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
@@ -213,8 +215,8 @@ void start_scan(uint32_t scan_time){
     }
     struct ble_gap_ext_disc_params params = {0};
     params.passive = true; // 被动扫描
-    params.itvl = CONFIG_APP_GENERAL_SCAN_ITVL;
-    params.window = CONFIG_APP_GENERAL_SCAN_WINDOW;
+    params.itvl = CONFIG_APP_SCAN_ITVL;
+    params.window = CONFIG_APP_SCAN_WINDOW;
     esp_err_t ret = ble_gap_ext_disc(
         own_addr_type,
         scan_time/10,
@@ -275,3 +277,5 @@ bool iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, s
     (*cur_ptr) += field_len+1;
     return true;
 }
+
+#endif

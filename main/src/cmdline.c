@@ -1,6 +1,6 @@
-#include "cli.h"
+#include "cmdline.h"
 
-#if CONFIG_APP_GENERAL_CLI_ENABLED
+#if CONFIG_APP_CLI_ENABLED
 
 #include "misc.h"
 #include <stdlib.h>
@@ -8,19 +8,24 @@
 #include "esp_system.h"
 #include "esp_crc.h"
 
-static const char* TAG = "CLI";
+static const char* TAG = "cmdline";
 
-inline static void backspace(){
-    uart_write_bytes(UART_NUM_0, "\b \b", 3);
+#define backspace() printf("\b \b")
+#define space() putchar(' ')
+#define nextline() putchar(' ')
+
+#pragma region Default Command
+
+static void cmd_help(struct CliContext *ctx, struct CliCommands *cmds){
+    
 }
 
-inline static void space(){
-    uart_write_bytes(UART_NUM_0, " ", 1);
+static void cmd_exit(struct CliContext *ctx, struct CliCommands *cmds){
+    println("reset");
+    esp_restart();
 }
 
-inline static void nextline(){
-    uart_write_bytes(UART_NUM_0, "\r\n", 2);
-}
+#pragma endregion
 
 inline static void cli_reset_ctx(struct CliContext* ctx){
     memset(ctx, 0, sizeof(struct CliContext));
@@ -31,7 +36,7 @@ static void cli_parse_line(struct CliContext *ctx, const struct CliCommands *cmd
         println("syntax error");
     }
     uint32_t crc32 = esp_crc32_le(0xcc114514, (uint8_t*)ctx->cmd_buf, ctx->cmd_len);
-    for (uint8_t i=0;i<CONFIG_APP_GENERAL_CLI_MAX_CMD_COUNT;i++){
+    for (uint8_t i=0;i<CONFIG_APP_CLI_MAX_CMD_COUNT;i++){
         const struct __CliCommandSlot *cmd = cmds->cmds+i;
         if (cmd->crc32==crc32&&cmd->len==ctx->cmd_len){
             if (memcmp(ctx->cmd_buf, cmd->cmd, ctx->cmd_len)&&cmd->func!=NULL){
@@ -53,7 +58,7 @@ static void cli_recv_byte(struct CliContext *ctx, const struct CliCommands *cmds
     if (ctx->seek==0){
         if (byte=='/'){
             ctx->seek++;
-            printf("/");
+            putchar('/');
         }
     } else if (ctx->seek==1){ // command
         if (byte=='\n'){
@@ -71,15 +76,15 @@ static void cli_recv_byte(struct CliContext *ctx, const struct CliCommands *cmds
                 ctx->seek--;
             }
             backspace();
-        } else if (ctx->cmd_len<CONFIG_APP_GENERAL_CLI_MAX_CMD_LEN){
+        } else if (ctx->cmd_len<CONFIG_APP_CLI_MAX_CMD_LEN){
             ctx->cmd_buf[ctx->cmd_len++] = byte;
-            uart_write_bytes(UART_NUM_0, &byte, 1);
+            putchar(byte);
         }
     } else { // arguments
         uint8_t arg_i = ctx->seek - 2;
         struct CliArgument *arg = ctx->args+arg_i;
         if (byte==' '){ // next argument
-            if (arg->len&&arg_i+1<CONFIG_APP_GENERAL_CLI_MAX_ARG_COUNT){
+            if (arg->len&&arg_i+1<CONFIG_APP_CLI_MAX_ARG_COUNT){
                 ctx->seek++;
                 space();
             }
@@ -94,9 +99,9 @@ static void cli_recv_byte(struct CliContext *ctx, const struct CliCommands *cmds
                 ctx->seek--;
             }
             backspace();
-        } else if (arg->len<CONFIG_APP_GENERAL_CLI_MAX_ARG_LEN){
+        } else if (arg->len<CONFIG_APP_CLI_MAX_ARG_LEN){
             arg->buf[arg->len++] = byte;
-            uart_write_bytes(UART_NUM_0, &byte, 1);
+            putchar(byte);
         }
     }
 }
@@ -121,11 +126,9 @@ void cli_init(struct CliContext **pctx, struct CliCommands **pcmds){
 [[noreturn]] void cli_loop(struct CliContext *ctx, struct CliCommands *cmds){
     println("begin cli\r\nType \"/help\" for more information.");
     for(;;){
-        char byte;
-        int len = uart_read_bytes(UART_NUM_0, &byte, 1, 100);
-        if (len){
-            cli_recv_byte(ctx, cmds, byte);
-        }
+        int byte = getchar();
+        if (byte==EOF) continue;
+        cli_recv_byte(ctx, cmds, byte);
     }
 }
 
@@ -133,13 +136,13 @@ void cli_add_cmd(struct CliCommands *cmds, const char *command, CliCommandFuncPt
     if (!command){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
     }
-    if (cmds->len<CONFIG_APP_GENERAL_CLI_MAX_CMD_COUNT){
+    if (cmds->len<CONFIG_APP_CLI_MAX_CMD_COUNT){
         uint32_t len = strlen(command);
-        if (len>=CONFIG_APP_GENERAL_CLI_MAX_CMD_LEN){
+        if (len>=CONFIG_APP_CLI_MAX_CMD_LEN){
             ESP_LOGE(TAG, "command too long");
             ESP_ERROR_CHECK(ESP_ERR_NOT_ALLOWED);
         }
-        for (uint32_t i=0;i<CONFIG_APP_GENERAL_CLI_MAX_CMD_LEN;i++){
+        for (uint32_t i=0;i<CONFIG_APP_CLI_MAX_CMD_LEN;i++){
             char byte = command[i];
             if (('A'<=byte&&byte<='Z')||('a'<=byte&&byte<='z')||('0'<=byte&&byte<='9')||byte=='_'){
                 ESP_LOGE(TAG, "invalid command char. at index %d: '\\x%X'", i, byte);
