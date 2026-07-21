@@ -17,11 +17,32 @@ static const char* TAG = "cmdline";
 #pragma region Default Command
 
 static void cmd_help(struct CliContext *ctx, struct CliCommands *cmds){
-    
+    println("============================");
+    if (cli_cmd_chk_arg_len(ctx, 0)){
+        for (uint8_t i=0;i<cmds->len;i++){
+            const struct __CliCommandSlot *cmd = cmds->cmds;
+            if (cmd->prompt){
+                printfln("%s: %s", cmd->cmd, cmd->prompt);
+            } else {
+                printfln("%s: Command havenot prompt", cmd->cmd);
+            }
+        }
+    } else if (cli_cmd_chk_arg_len(ctx, 1)){
+        const char* a = cli_cmd_get_arg_str(ctx, 0);
+        uint8_t al = cli_cmd_get_arg_strlen(ctx, 0);
+        const struct __CliCommandSlot *cmd = cli_find_cmd(cmds, a, al);
+        if (cmd->prompt){
+            printfln("%s", cmd->prompt);
+        } else {
+            println("Command havenot prompt");
+        }
+    } else {
+        cli_cmd_invalid_arg();
+    }
 }
 
 static void cmd_exit(struct CliContext *ctx, struct CliCommands *cmds){
-    println("reset");
+    println("exit");
     esp_restart();
 }
 
@@ -31,22 +52,28 @@ inline static void cli_reset_ctx(struct CliContext* ctx){
     memset(ctx, 0, sizeof(struct CliContext));
 }
 
+const struct __CliCommandSlot *cli_find_cmd(const struct CliCommands *cmds, const char *name, uint8_t name_len){
+    uint32_t crc = esp_crc32_le(0xcc114514, (const uint8_t*)name, name_len);
+    for (uint8_t i=0;i<cmds->len;i++){
+        const struct __CliCommandSlot *cmd = cmds->cmds+i;
+        if (cmd->crc32==crc&&cmd->len==name_len&&memcmp(cmd->cmd, name, name_len)){
+            return cmd;
+        }
+    }
+    return NULL;
+}
+
 static void cli_parse_line(struct CliContext *ctx, const struct CliCommands *cmds){
     if (!ctx->cmd_len){
         println("syntax error");
     }
-    uint32_t crc32 = esp_crc32_le(0xcc114514, (uint8_t*)ctx->cmd_buf, ctx->cmd_len);
-    for (uint8_t i=0;i<CONFIG_APP_CLI_MAX_CMD_COUNT;i++){
-        const struct __CliCommandSlot *cmd = cmds->cmds+i;
-        if (cmd->crc32==crc32&&cmd->len==ctx->cmd_len){
-            if (memcmp(ctx->cmd_buf, cmd->cmd, ctx->cmd_len)&&cmd->func!=NULL){
-                cmd->func(ctx, cmds);
-                cli_reset_ctx(ctx);
-                return;
-            }
-        }
+    const struct __CliCommandSlot *cmd = cli_find_cmd(cmds, ctx->cmd_buf, ctx->cmd_len);
+    if (!cmd){
+        println("error: command not found");
+        return;
     }
-    println("error: command not found");
+    cmd->func(ctx, cmds);
+    cli_reset_ctx(ctx);
 }
 
 static void cli_recv_byte(struct CliContext *ctx, const struct CliCommands *cmds, char byte){
@@ -84,7 +111,7 @@ static void cli_recv_byte(struct CliContext *ctx, const struct CliCommands *cmds
         uint8_t arg_i = ctx->seek - 2;
         struct CliArgument *arg = ctx->args+arg_i;
         if (byte==' '){ // next argument
-            if (arg->len&&arg_i+1<CONFIG_APP_CLI_MAX_ARG_COUNT){
+            if (arg->len&&arg_i+1<CONFIG_APP_CLI_MAX_ARG_NUM){
                 ctx->seek++;
                 space();
             }
@@ -126,9 +153,14 @@ void cli_init(struct CliContext **pctx, struct CliCommands **pcmds){
 [[noreturn]] void cli_loop(struct CliContext *ctx, struct CliCommands *cmds){
     println("begin cli\r\nType \"/help\" for more information.");
     for(;;){
-        int byte = getchar();
-        if (byte==EOF) continue;
-        cli_recv_byte(ctx, cmds, byte);
+        //int byte = getchar();
+        //if (byte==EOF) continue;
+        //cli_recv_byte(ctx, cmds, byte);
+        char buf[64];
+        char received = uart_read_bytes(UART_NUM_0, buf, sizeof(buf), pdMS_TO_TICKS(100));
+        for (uint8_t i=0; i<received; i++){
+            cli_recv_byte(ctx, cmds, buf[i]);
+        }
     }
 }
 
@@ -136,7 +168,7 @@ void cli_add_cmd(struct CliCommands *cmds, const char *command, CliCommandFuncPt
     if (!command){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
     }
-    if (cmds->len<CONFIG_APP_CLI_MAX_CMD_COUNT){
+    if (cmds->len<CONFIG_APP_CLI_MAX_CMD_NUM){
         uint32_t len = strlen(command);
         if (len>=CONFIG_APP_CLI_MAX_CMD_LEN){
             ESP_LOGE(TAG, "command too long");

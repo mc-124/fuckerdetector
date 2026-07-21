@@ -20,7 +20,7 @@ struct CliContext {
     uint8_t seek;
     uint8_t cmd_len;
     char cmd_buf[CONFIG_APP_CLI_MAX_CMD_LEN+1];
-    struct CliArgument args[CONFIG_APP_CLI_MAX_ARG_COUNT];
+    struct CliArgument args[CONFIG_APP_CLI_MAX_ARG_NUM];
 };
 #pragma pack()
 struct CliCommands;
@@ -29,16 +29,18 @@ typedef void(*CliCommandFuncPtr)(struct CliContext*, const struct CliCommands*);
 struct __CliCommandSlot {
     uint8_t len;    // 不包含字符串的\0
     uint32_t crc32; // 不包含字符串的\0
-    const char* cmd; // 不包含\0
+    const char* cmd;
     CliCommandFuncPtr func;
     const char* prompt;
 };
 
 struct CliCommands {
     uint8_t len;
-    struct __CliCommandSlot cmds[CONFIG_APP_CLI_MAX_CMD_COUNT];
+    struct __CliCommandSlot cmds[CONFIG_APP_CLI_MAX_CMD_NUM];
 };
 // 没必要使用哈希表
+
+const struct __CliCommandSlot *cli_find_cmd(const struct CliCommands *cmds, const char *name, uint8_t name_len);
 
 /// @brief 初始化CLI
 /// @param pctx 返回CLI上下文结构体指针
@@ -87,5 +89,7 @@ inline uint8_t cli_cmd_get_arg_strlen(const struct CliContext *ctx, uint8_t inde
     if (!cli_cmd_chk_arg_len(ctx, index+1)) return 0;
     return ctx->args[index].len;
 }
+
+#define cli_cmd_invalid_arg() do {println("error: invalid arguments");return;} while(0)
 
 #endif // CONFIG_APP_CLI_ENABLED

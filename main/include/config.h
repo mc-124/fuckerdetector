@@ -81,8 +81,8 @@ static_assert(
         "invalid cli command length"
     );
     static_assert(
-        1<=CONFIG_APP_CLI_MAX_ARG_COUNT&&CONFIG_APP_CLI_MAX_ARG_COUNT<=63,
-        "invalid cli arguments count"
+        1<=CONFIG_APP_CLI_MAX_ARG_NUM&&CONFIG_APP_CLI_MAX_ARG_NUM<=63,
+        "invalid cli arguments NUM"
     );
     static_assert(
         8<=CONFIG_APP_CLI_MAX_ARG_LEN&&CONFIG_APP_CLI_MAX_ARG_LEN<=255,
@@ -92,6 +92,7 @@ static_assert(
 
 static_assert(500<=CONFIG_APP_SERVER_ADV_DURATION&&CONFIG_APP_SERVER_ADV_DURATION<=60000, "invalid server adv duration");
 static_assert(500<=CONFIG_APP_CLIENT_ADV_DURATION&&CONFIG_APP_CLIENT_ADV_DURATION<=60000, "invalid client adv duration");
+static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MAX_NUM<=255, "invalid server sleep interval number");
 
 #define FIRMWARE_VERSION CONFIG_APP_PROJECT_VER
 

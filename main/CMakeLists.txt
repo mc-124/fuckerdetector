@@ -1,6 +1,6 @@
 idf_component_register(SRCS 
     "src/misc.c"
-    "src/public.c"
+    "src/settings.c"
     "src/blelib.c" 
     "src/cmdline.c"
     "src/client.c"

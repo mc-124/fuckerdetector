@@ -49,8 +49,8 @@ menu "FuckerDetector config"
             default 32
             depends on APP_CLI_ENABLED
                 
-        config APP_CLI_MAX_ARG_COUNT
-            int "Max arguments count"
+        config APP_CLI_MAX_ARG_NUM
+            int "Max arguments number"
             range 1 63
             default 4
             depends on APP_CLI_ENABLED
@@ -61,8 +61,8 @@ menu "FuckerDetector config"
             default 16
             depends on APP_CLI_ENABLED
 
-        config APP_CLI_MAX_CMD_COUNT
-            int "Max command count"
+        config APP_CLI_MAX_CMD_NUM
+            int "Max command number"
             range 4 64
             default 16
     
@@ -152,6 +152,11 @@ menu "FuckerDetector config"
             int "Min advertising interval (ms)"
             range 20 10240
             default 32
+
+        config APP_SERVER_SLPITVL_MAX_NUM
+            int "Max sleep interval"
+            range 2 255
+            default 16
 
     endmenu
 

@@ -2,9 +2,9 @@
 #if CONFIG_APP_SERVER
 
 #include "misc.h"
+#include "settings.h"
 #include "blelib.h"
 #include "cmdline.h"
-#include "public.h"
 
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -54,6 +54,8 @@ static
 #endif
 
 void app_init(){
+    uart_driver_install(UART_NUM_0, 1024, 1024, 10, NULL, 0);
+
     println(FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
 
     init_gpio(PIN_FUNCT, GPIO_MODE_INPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);
@@ -80,18 +82,22 @@ void app_init(){
     init_bluetooth();
     init_advertising();
 
+    init_settings();
+    load_settings();
     
 #if CONFIG_APP_CLI_ENABLED
     if (gpio_get_level(PIN_CMDLINE)==0){
         struct CliContext *clictx = NULL;
         struct CliCommands *clicmds = NULL;
         cli_init(&clictx, &clicmds);
+        cli_loop(clictx, clicmds);
     }
 #endif
 }
 
 void app_main(){
     app_init();
+    
     ESP_LOGI(TAG, "end init");
 }
 

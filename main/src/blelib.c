@@ -1,6 +1,5 @@
 #include "blelib.h"
 
-#include "error.h"
 #include "misc.h"
 
 #include "esp_log.h"

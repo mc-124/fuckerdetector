@@ -89,3 +89,49 @@ void init_nvs(){
 void delay_ms(uint32_t ms){
     vTaskDelay(pdMS_TO_TICKS(ms));
 }
+
+int sec_add(int a, int b){
+    int r = a + b;
+    if (r>=86400){
+        return r - 86400;
+    }
+    return r;
+}
+
+int sec_sub(int a, int b){
+    int r = a - b;
+    if (r<0){
+        return r + 86400;
+    }
+    return r;
+}
+
+struct SleepInterval *find_inprogress_sleepinterval(struct SleepInterval *itvls, uint8_t len, int now){
+    for (uint8_t i=0; i<len; i++){
+        struct SleepInterval *this = itvls + i;
+        if (this->start==0xffffffff||this->end==0xffffffff){
+            continue;
+        }
+        if (this->start<=now&&now<=this->end){
+            return this;
+        }
+    }
+    return NULL;
+}
+
+struct SleepInterval *find_next_sleepinterval(struct SleepInterval *itvls, uint8_t len, int now){
+    struct SleepInterval *min = NULL;
+    int min_diff = 0;
+    for (uint8_t i=0; i<len; i++){
+        struct SleepInterval *this = itvls + i;
+        if (this->start==0xffffffff||this->end==0xffffffff){
+            continue;
+        }
+        int diff = sec_sub(this->start, now);
+        if (!min||diff<min_diff){
+            min = this;
+            min_diff = diff;
+        }
+    }
+    return min;
+}
