@@ -5,6 +5,7 @@
 #include "settings.h"
 #include "blelib.h"
 #include "repl.h"
+#include "raderctl.h"
 
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -80,6 +81,7 @@ void app_init(){
     
     if (gpio_get_level(PIN_CMDLINE)==0){
         init_repl();
+        init_raderctl();
         begin_repl();
     }
 }

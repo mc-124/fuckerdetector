@@ -17,6 +17,7 @@
 #define printfln(msg, ...) printf(msg "\r\n", __VA_ARGS__)
 
 #define led(en) gpio_set_level(PIN_LED, !en)
+#define peripheral_pw(en) gpio_set_level(PIN_OUTPUT, en)
 
 struct SleepInterval {
     int start;
