@@ -48,12 +48,6 @@ static void rtc_clear_osf(){
 
 #endif
 
-#if CONFIG_APP_CLI_ENABLED
-
-
-
-#endif
-
 void app_init(){
     println(FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
 
@@ -65,7 +59,7 @@ void app_init(){
 #endif
 
     init_vbat_adc();
-    init_peri_uart();
+    //init_peri_uart();
 
     init_nvs();
 

@@ -38,11 +38,6 @@ menu "FuckerDetector config"
             hex "Protocol version"
             range 0x0000 0xffff
             default 0xCC55
-
-        config APP_CLI_MAX_HISTORY
-            int "Max history line"
-            range 0 255
-            default 16
     
     endmenu
 
@@ -71,14 +66,13 @@ menu "FuckerDetector config"
 
         config APP_CLIENT_TX_CLIENTRESP
             bool "Enable transmit client response"
-            default n
+            default y
             depends on APP_CLIENT_RX_CLIENTALARM
 
-        config APP_CLIENT_RESP_SCAN_DURATION
-            int "Scan response duration (ms)"
-            range 500 60000
-            default 2000
-            depends on APP_CLIENT_RX_CLIENTALARM
+        config APP_CLIENT_RX_CLIENTRESP
+            bool "Enable receive client response"
+            default y 
+            depends on APP_CLIENT_TX_CLIENTALARM
 
         # ble advertising
 
@@ -113,6 +107,12 @@ menu "FuckerDetector config"
             range 20 10240
             default 48
             depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
+
+        config APP_CLIENT_RESP_SCAN_DURATION
+            int "Scan response duration (ms)"
+            range 500 60000
+            default 2000
+            depends on APP_CLIENT_RX_CLIENTRESP
 
     endmenu
 
@@ -154,9 +154,39 @@ menu "FuckerDetector config"
             default 32
 
         config APP_SERVER_SLPITVL_MAX_NUM
-            int "Max sleep interval"
+            int "Max sleep intervals number"
             range 2 255
             default 16
+
+        choice APP_SERVER_RADER_TYPE
+            prompt "Rader type"
+            default APP_SERVER_RADER_HLKLD1040
+
+            config APP_SERVER_RADER_UNKNOWN
+                bool "Unknown"
+
+            config APP_SERVER_RADER_HLKLD1040
+                bool "HLK-LD1040 / HLK-LD1040C"
+
+        endchoice
+
+        choice APP_SERVER_RADER_TRIG_TYPE
+            prompt "Rader trigger level"
+            default APP_SERVER_RADER_TRIG_HIGH
+            depends on APP_SERVER_RADER_UNKNOWN
+
+            config APP_SERVER_RADER_TRIG_HIGH
+                bool "High-level trigger"
+
+            config APP_SERVER_RADER_TRIG_LOW
+                bool "Low-level trigger"
+        endchoice
+
+        config APP_SERVER_RADER_PWRON_DURATION
+            int "Rader power on wait duration (ms)"
+            range 0 60000
+            default 7000
+            depends on APP_SERVER_RADER_UNKNOWN
 
     endmenu
 

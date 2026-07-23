@@ -1,6 +1,8 @@
 #pragma once
 #include "config.h"
 
+#if FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
+
 #include "host/ble_gap.h"
 
 #if !CONFIG_BT_NIMBLE_ENABLED
@@ -54,14 +56,15 @@ struct PayloadField {
     uint8_t *data;
 };
 
-/// @brief 初始化一些基本的东西
-void init_bt_base();
-
 /// @brief 初始化蓝牙控制器 BLE协议栈 GAP服务
 void init_bluetooth();
 
 /// @brief 反初始化蓝牙控制器 BLE协议栈
 void deinit_bluetooth();
+
+#endif // FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
+
+#if FIRMWARE_BLE_ADV
 
 /// @brief 初始化广告
 void init_advertising();
@@ -73,6 +76,10 @@ void start_advertising(struct AdvManfacturerData *data, uint32_t adv_time);
 
 /// @brief 停止发送广告
 void stop_advertising();
+
+#endif // FIRMWARE_BLE_ADV
+
+#if FIRMWARE_BLE_SCAN
 
 /// @brief 设置扫描回调
 /// @param func 扫描回调函数指针
@@ -92,3 +99,5 @@ void stop_scan();
 /// @param result 迭代结果
 /// @return 是否成功
 bool iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result);
+
+#endif // FIRMWARE_BLE_SCAN

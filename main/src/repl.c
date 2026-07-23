@@ -5,6 +5,7 @@
 #include "driver/uart.h"
 #include "esp_crc.h"
 #include "esp_task_wdt.h"
+#include "esp_system.h"
 
 static const char *TAG = "repl";
 
@@ -50,6 +51,8 @@ static const struct ReplCommand *find_command(const char *name, uint8_t name_len
     return NULL;
 }
 
+#pragma region 内置命令
+
 static void cmd_version(uint8_t argc, const char**){
     if (argc){
         println("error: invalid arguments");
@@ -85,18 +88,35 @@ static void cmd_help(uint8_t argc, const char **args){
     }
 }
 
+static void cmd_exit(uint8_t argc, const char **args){
+    if (argc){
+        println("error: invalid arguments");
+        return;
+    }
+    println("exit");
+    fflush(stdin);
+    delay_ms(500);
+    esp_restart();
+}
+
+#pragma endregion 内置命令
+
 void __add_command(const char *name, const char *prompt, ReplFuncPtr func){
     assert(name);
     assert(prompt);
     assert(func);
     if (ctx->cmdc>=REPL_MAX_CMDS){
-        ESP_LOGE(TAG, "command array full");
+        ESP_LOGE(TAG, "add command failed: command array full");
         return;
     }
     uint8_t len = strlen(name);
+    if (len>REPL_MAX_CMD_LEN){
+        ESP_LOGE(TAG, "add command failed: name too long");
+        return;
+    }
     const struct ReplCommand *cmd = find_command(name, len);
     if (cmd){
-        ESP_LOGE(TAG, "repeat command: %s", name);
+        ESP_LOGE(TAG, "add command failed: repeat command: %s", name);
         return;
     }
     struct ReplCommand *freeslot = ctx->cmds + (ctx->cmdc++);
@@ -133,6 +153,7 @@ void init_repl(){
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 256, 256, 0, NULL, 0));
     add_command("help", "Print information for help", cmd_help);
     add_command("version", "Print firmware version", cmd_version);
+    add_command("exit", "Exit REPL and reset chip", cmd_exit);
 }
 
 #define is_valid_char(__b) (32<__b&&__b<127)
@@ -232,7 +253,7 @@ static void proc_byte(char byte){
     }
 }
 
-void begin_repl(){
+[[noreturn]] void begin_repl(){
     assert(ctx);
     led(0);
     esp_task_wdt_deinit();

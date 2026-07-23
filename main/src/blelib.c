@@ -1,5 +1,7 @@
 #include "blelib.h"
 
+#if FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
+
 #include "misc.h"
 
 #include "esp_log.h"
@@ -26,7 +28,9 @@ static uint8_t addr_val[6] = {0};
 
 static_assert(sizeof(addr_val)==6, "MAC buffer error");
 
+#if FIRMWARE_BLE_SCAN
 static ScanDiscCallbackFuncPtr scan_callback_func = NULL;
+#endif // FIRMWARE_BLE_SCAN
 
 /// @brief NimBLE 事件回调函数
 /// @param event 事件
@@ -34,10 +38,13 @@ static ScanDiscCallbackFuncPtr scan_callback_func = NULL;
 /// @return 状态
 static int event_callback(struct ble_gap_event *event, void *arg){
     switch (event->type){
-        case BLE_GAP_EVENT_ADV_COMPLETE:
+#if FIRMWARE_BLE_ADV
+        case BLE_GAP_EVENT_ADV_COMPLETE: // adv
             ESP_LOGI(TAG, "adv completed. reason=%d", event->adv_complete);
             break;
-        case BLE_GAP_EVENT_EXT_DISC:
+#endif // FIRMWARE_BLE_ADV
+#if FIRMWARE_BLE_SCAN
+        case BLE_GAP_EVENT_EXT_DISC: // scan
             if (scan_callback_func){
                 scan_callback_func(&event->ext_disc);
             }
@@ -45,6 +52,7 @@ static int event_callback(struct ble_gap_event *event, void *arg){
         case BLE_GAP_EVENT_DISC_COMPLETE:
             ESP_LOGI(TAG, "Scan completed. reason=%d", event->disc_complete);
             break;
+#endif // FIRMWARE_BLE_SCAN
         default:
             break;
     }
@@ -113,6 +121,10 @@ void deinit_bluetooth(){
     nimble_port_freertos_deinit();
     ESP_ERROR_CHECK(esp_bt_controller_deinit());
 }
+
+#endif // FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
+
+#if FIRMWARE_BLE_ADV
 
 void init_advertising(){
     esp_err_t ret = ble_hs_util_ensure_addr(0); // 使用公共地址
@@ -199,7 +211,9 @@ void stop_advertising(){
     }
 }
 
-#if CONFIG_APP_CLIENT
+#endif // FIRMWARE_BLE_ADV
+
+#if FIRMWARE_BLE_SCAN
 
 void set_scan_callback(const ScanDiscCallbackFuncPtr func){
     if (!func){
@@ -277,4 +291,4 @@ bool iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, s
     return true;
 }
 
-#endif
+#endif // FIRMWARE_BLE_SCAN
