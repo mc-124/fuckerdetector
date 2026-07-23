@@ -39,31 +39,9 @@ menu "FuckerDetector config"
             range 0x0000 0xffff
             default 0xCC55
 
-        config APP_CLI_ENABLED
-            bool "Enable command line"
-            default y
-
-        config APP_CLI_MAX_CMD_LEN
-            int "Max command length"
-            range 8 255
-            default 32
-            depends on APP_CLI_ENABLED
-                
-        config APP_CLI_MAX_ARG_NUM
-            int "Max arguments number"
-            range 1 63
-            default 4
-            depends on APP_CLI_ENABLED
-
-        config APP_CLI_MAX_ARG_LEN
-            int "Max argument length"
-            range 8 255
-            default 16
-            depends on APP_CLI_ENABLED
-
-        config APP_CLI_MAX_CMD_NUM
-            int "Max command number"
-            range 4 64
+        config APP_CLI_MAX_HISTORY
+            int "Max history line"
+            range 0 255
             default 16
     
     endmenu
@@ -79,40 +57,62 @@ menu "FuckerDetector config"
             string "Advertising name (length <= 16 char)"
             default "cliV2"
 
-        config APP_CLIENT_RESPONSE_ENABLED
-            bool "Enable alarm response"
-            default n
+        config APP_CLIENT_RX_SERVERALARM
+            bool "Enable receive server alarm"
+            default y
 
-        config APP_CLIENT_RESPONSE_SCAN_DURATION
+        config APP_CLIENT_TX_CLIENTALARM
+            bool "Enable transmit client alarm"
+            default y
+        
+        config APP_CLIENT_RX_CLIENTALARM
+            bool "Enable receive client alarm"
+            default y 
+
+        config APP_CLIENT_TX_CLIENTRESP
+            bool "Enable transmit client response"
+            default n
+            depends on APP_CLIENT_RX_CLIENTALARM
+
+        config APP_CLIENT_RESP_SCAN_DURATION
             int "Scan response duration (ms)"
             range 500 60000
             default 2000
-            depends on APP_CLIENT_RESPONSE_ENABLED
+            depends on APP_CLIENT_RX_CLIENTALARM
+
+        # ble advertising
 
         config APP_CLIENT_ADV_DURATION
             int "Advertising duration (ms)"
             range 500 60000
             default 3000
+            depends on APP_CLIENT_TX_CLIENTALARM
 
         config APP_CLIENT_ADV_ITVL_MAX
             int "Max advertising interval (ms)"
             range 20 10240
             default 128
+            depends on APP_CLIENT_TX_CLIENTALARM
         
         config APP_CLIENT_ADV_ITVL_MIN
             int "Min advertising interval (ms)"
             range 20 10240
             default 32
+            depends on APP_CLIENT_TX_CLIENTALARM
+
+        # ble scanning
 
         config APP_CLIENT_SCAN_ITVL
             int "Scan interval (ms)"
             range 20 10240
             default 96
+            depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
 
         config APP_CLIENT_SCAN_WINDOW
             int "Scan window (ms)"
             range 20 10240
             default 48
+            depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
 
     endmenu
 

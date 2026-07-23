@@ -75,20 +75,21 @@ static_assert(
     "invalid advertising interval"
 );
 
-#if CONFIG_APP_CLI_ENABLED
-    static_assert(
-        8<=CONFIG_APP_CLI_MAX_CMD_LEN&&CONFIG_APP_CLI_MAX_CMD_LEN<=255,
-        "invalid cli command length"
-    );
-    static_assert(
-        1<=CONFIG_APP_CLI_MAX_ARG_NUM&&CONFIG_APP_CLI_MAX_ARG_NUM<=63,
-        "invalid cli arguments NUM"
-    );
-    static_assert(
-        8<=CONFIG_APP_CLI_MAX_ARG_LEN&&CONFIG_APP_CLI_MAX_ARG_LEN<=255,
-        "invalid cli argument length"
-    );
-#endif // CONFIG_APP_CLI_ENABLED
+#if CONFIG_APP_SERVER
+#   define FIRMWARE_BLE_SCAN 0
+#   define FIRMWARE_BLE_ADV 1
+#elif CONFIG_APP_CLIENT
+#   if CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
+#       define FIRMWARE_BLE_SCAN 1
+#   else
+#       define FIRMWARE_BLE_SCAN 0
+#   endif
+#   if CONFIG_APP_CLIENT_TX_CLIENTALARM
+#       define FIRMWARE_BLE_ADV 1
+#   else
+#       define FIRMWARE_BLE_ADV 0
+#   endif
+#endif
 
 static_assert(500<=CONFIG_APP_SERVER_ADV_DURATION&&CONFIG_APP_SERVER_ADV_DURATION<=60000, "invalid server adv duration");
 static_assert(500<=CONFIG_APP_CLIENT_ADV_DURATION&&CONFIG_APP_CLIENT_ADV_DURATION<=60000, "invalid client adv duration");
@@ -103,6 +104,19 @@ static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MA
 #ifndef CONFIG_APP_SERVER_RTC_DS3231
 #define CONFIG_APP_SERVER_RTC_DS3231 0
 #endif /* CONFIG_APP_SERVER_RTC_DS3231 */
+
+#ifdef __clang__
+#define COMPILER_VERSION "Clang" \
+    STRINGIFY(__clang_major__) "." \
+    STRINGIFY(__clang_minor__) "." \
+    STRINGIFY(__clang_patchlevel__)
+#elif __GNUC__
+#define COMPILER_VERSION "GCC " \
+    STRINGIFY(__GNUC__) "." \
+    STRINGIFY(__GNUC_MINOR__) "." \
+    STRINGIFY(__GNUC_PATCHLEVEL__)
+#endif
+
 
 // ADC 读取电池 1/2 分压后电压
 #define CHAN_VBAT   ADC_CHANNEL_1
@@ -125,3 +139,9 @@ static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MA
 #define PERI_SSD1306_ADDR 0x3C
 #define PERI_AT24C32_ADDR 0b1010111
 #define PERI_IIC_FREQ 1000000
+
+#define REPL_MAX_CMDS 8
+#define REPL_MAX_ARGS 8
+#define REPL_MAX_CMD_LEN 12
+#define REPL_MAX_ARG_LEN 12
+#define REPL_CRC32_DEFAULT 0xCC114514
