@@ -1,7 +1,7 @@
 #include "repl.h"
 #include "misc.h"
 
-#include "string.h"
+#include <string.h>
 #include "driver/uart.h"
 #include "esp_crc.h"
 #include "esp_task_wdt.h"
@@ -9,7 +9,7 @@
 
 static const char *TAG = "repl";
 
-struct ReplCommand {
+struct repl_command {
     uint8_t name_len;
     uint8_t prompt_len;
     uint32_t name_crc32;
@@ -18,26 +18,26 @@ struct ReplCommand {
     ReplFuncPtr func;
 };
 
-struct ReplContext {
+struct repl_context {
     uint8_t cmdc; // no rst
     uint8_t seek;
     uint8_t cmd_strlen;
     uint8_t args_strlen[REPL_MAX_ARGS];
     char cmd_strbuf[REPL_MAX_CMD_LEN+1];
     char args_strbuf[REPL_MAX_ARGS][REPL_MAX_ARG_LEN+1];
-    struct ReplCommand cmds[REPL_MAX_CMDS]; // no rst
+    struct repl_command cmds[REPL_MAX_CMDS]; // no rst
     const char *args_array[REPL_MAX_ARGS];
 };
 
-static struct ReplContext *ctx = NULL;
+static struct repl_context *ctx = NULL;
 
-static const struct ReplCommand *find_command(const char *name, uint8_t name_len){
+static const struct repl_command *repl_find_command(const char *name, uint8_t name_len){
     if (!name_len){
         return NULL;
     }
     uint32_t name_crc32 = esp_crc32_le(REPL_CRC32_DEFAULT, (const uint8_t*)name, name_len);
     for (uint8_t i=0; i<ctx->cmdc; i++){
-        const struct ReplCommand *cmd = ctx->cmds + i;
+        const struct repl_command *cmd = ctx->cmds + i;
         if (!cmd->func){
             continue;
         }
@@ -68,7 +68,7 @@ static void cmd_version(uint8_t argc, const char**){
 
 static void cmd_help(uint8_t argc, const char **args){
     if (argc==1){
-        const struct ReplCommand *cmd = find_command(args[0], strlen(args[0]));
+        const struct repl_command *cmd = repl_find_command(args[0], strlen(args[0]));
         if (!cmd||!cmd->func){
             println("error: command not found");
             return;
@@ -78,7 +78,7 @@ static void cmd_help(uint8_t argc, const char **args){
     } else if (argc==0){
         println("-------- HELP --------");
         for (uint8_t i=0; i<REPL_MAX_CMDS; i++){
-            const struct ReplCommand *cmd = ctx->cmds+i;
+            const struct repl_command *cmd = ctx->cmds+i;
             if (cmd->func){
                 printfln("- (%s): %s", cmd->name, cmd->prompt);
             }
@@ -95,13 +95,13 @@ static void cmd_exit(uint8_t argc, const char **args){
     }
     println("exit");
     fflush(stdin);
-    delay_ms(500);
+    misc_delay_ms(500);
     esp_restart();
 }
 
 #pragma endregion 内置命令
 
-void __add_command(const char *name, const char *prompt, ReplFuncPtr func){
+void repl_add_command(const char *name, const char *prompt, ReplFuncPtr func){
     assert(name);
     assert(prompt);
     assert(func);
@@ -114,12 +114,12 @@ void __add_command(const char *name, const char *prompt, ReplFuncPtr func){
         ESP_LOGE(TAG, "add command failed: name too long");
         return;
     }
-    const struct ReplCommand *cmd = find_command(name, len);
+    const struct repl_command *cmd = repl_find_command(name, len);
     if (cmd){
         ESP_LOGE(TAG, "add command failed: repeat command: %s", name);
         return;
     }
-    struct ReplCommand *freeslot = ctx->cmds + (ctx->cmdc++);
+    struct repl_command *freeslot = ctx->cmds + (ctx->cmdc++);
     freeslot->name = name;
     freeslot->name_len = len;
     freeslot->name_crc32 = esp_crc32_le(REPL_CRC32_DEFAULT, (const uint8_t*)name, len);
@@ -129,7 +129,7 @@ void __add_command(const char *name, const char *prompt, ReplFuncPtr func){
     ESP_LOGI(TAG, "add command: %s", name);
 }
 
-static void reset_context(){
+static void repl_rst_ctx(){
     assert(ctx);
     ctx->seek = 0;
     ctx->cmd_strlen = 0;
@@ -138,13 +138,13 @@ static void reset_context(){
     memset(ctx->args_strbuf, 0, sizeof(ctx->args_strbuf));
 }
 
-void init_repl(){
+void repl_init(){
     assert(!ctx);
-    ctx = malloc(sizeof(struct ReplContext));
+    ctx = malloc(sizeof(struct repl_context));
     if (!ctx){
         ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
     }
-    reset_context();
+    repl_rst_ctx();
     memset(ctx->cmds, 0, sizeof(ctx->cmds));
     for (uint8_t i=0; i<REPL_MAX_ARGS; i++){
         ctx->args_array[i] = ctx->args_strbuf[i];
@@ -164,10 +164,10 @@ void init_repl(){
     } while (0);
 #define pr_beep() \
     do {                \
-        led(1);         \
+        gpio_set_level(PIN_LED, 1);         \
         pr_char(7);     \
-        delay_ms(20);   \
-        led(0);         \
+        misc_delay_ms(20);   \
+        gpio_set_level(PIN_LED, 0);         \
     } while(0)
 #define pr_backspace() \
     do {                \
@@ -186,10 +186,10 @@ void init_repl(){
         pr_char(' ');   \
     } while (0)
 
-static void proc_line(){
+static void repl_proc_line(){
     pr_nextline();
 
-    const struct ReplCommand *cmd = find_command(ctx->cmd_strbuf, ctx->cmd_strlen);
+    const struct repl_command *cmd = repl_find_command(ctx->cmd_strbuf, ctx->cmd_strlen);
     if (!cmd){
         println("error: invalid command");
         goto end;
@@ -198,11 +198,11 @@ static void proc_line(){
     cmd->func(ctx->seek, ctx->args_array);
 
     end:
-    reset_context();
+    repl_rst_ctx();
     pr_repl_prompt();
 }
 
-static void proc_byte(char byte){
+static void repl_proc_byte(char byte){
     char *buf;
     uint8_t *len;
 
@@ -233,10 +233,10 @@ static void proc_byte(char byte){
         }
     } else if (byte=='\n'||byte=='\t'){
         if (*len){
-            proc_line();
+            repl_proc_line();
         } else if (ctx->seek){
             ctx->seek--;
-            proc_line();
+            repl_proc_line();
         } else {
             pr_beep();
         }
@@ -253,17 +253,18 @@ static void proc_byte(char byte){
     }
 }
 
-[[noreturn]] void begin_repl(){
+[[noreturn]] void repl_begin(){
     assert(ctx);
-    led(0);
+    gpio_set_level(PIN_LED, 0);
     esp_task_wdt_deinit();
+    println("Type \"help\" for more information.");
     pr_repl_prompt();
     for (;;){
         char byte;
         if (uart_read_bytes(UART_NUM_0, &byte, 1, pdMS_TO_TICKS(50))){
-            proc_byte(byte);
+            repl_proc_byte(byte);
         } else {
-            delay_ms(5);
+            misc_delay_ms(5);
         }
     }
 }

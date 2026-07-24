@@ -4,11 +4,16 @@
 
 #if CONFIG_APP_SERVER&&CONFIG_APP_SERVER_RADER_HLKLD1040
 
-void __init_raderctl();
-#define init_raderctl() __init_raderctl()
+#ifdef CONFIG_APP_SERVER_RADER_PWRON_DURATION
+#undef CONFIG_APP_SERVER_RADER_PWRON_DURATION
+#endif
+#define CONFIG_APP_SERVER_RADER_PWRON_DURATION 7000
+
+void __raderctl_init();
+#define raderctl_init() __raderctl_init()
 
 #endif // CONFIG_APP_SERVER&&CONFIG_APP_SERVER_RADER_HLKLD1040
 
-#ifndef init_raderctl
-#define init_raderctl() do {} while(0)
-#endif // init_raderctl
+#ifndef raderctl_init
+#define raderctl_init() do {} while(0)
+#endif // raderctl_init

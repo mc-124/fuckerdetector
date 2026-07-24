@@ -6,14 +6,15 @@
 #include "driver/uart.h"
 #include "driver/i2c_master.h"
 #include "nvs_flash.h"
+#include "esp_sleep.h"
 
 static const char* TAG = "Misc";
 
-static adc_oneshot_unit_handle_t adc_h;
-static adc_cali_handle_t cali_h;
-static i2c_master_bus_handle_t iic_h;
+static adc_oneshot_unit_handle_t misc_adc_h;
+static adc_cali_handle_t misc_cali_h;
+static i2c_master_bus_handle_t misc_iic_h;
 
-void init_gpio(gpio_num_t pin, gpio_mode_t mode, gpio_pull_mode_t pull, gpio_int_type_t intr){
+void misc_gpio_init(gpio_num_t pin, gpio_mode_t mode, gpio_pull_mode_t pull, gpio_int_type_t intr){
     gpio_config_t config = {
         .pin_bit_mask = 1ULL<<pin,
         .mode = mode,
@@ -24,33 +25,33 @@ void init_gpio(gpio_num_t pin, gpio_mode_t mode, gpio_pull_mode_t pull, gpio_int
     ESP_ERROR_CHECK(gpio_config(&config));
 }
 
-void init_vbat_adc(){
+void misc_vbat_init(){
     adc_oneshot_unit_init_cfg_t unit_cfg = {
         .unit_id = ADC_UNIT_1
     };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &adc_h));
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &misc_adc_h));
     adc_oneshot_chan_cfg_t chan_cfg = {
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_12
     };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_h, CHAN_VBAT, &chan_cfg));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(misc_adc_h, CHAN_VBAT, &chan_cfg));
     adc_cali_curve_fitting_config_t cali_cfg = {
         .unit_id = ADC_UNIT_1,
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_12,
     };
-    ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cali_cfg, &cali_h));
+    ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cali_cfg, &misc_cali_h));
 }
 
-float read_vbat(){
+float misc_vbat_read(){
     int raw,mv = 0;
-    adc_oneshot_read(adc_h, CHAN_VBAT, &raw);
-    adc_cali_raw_to_voltage(cali_h, raw, &mv);
+    adc_oneshot_read(misc_adc_h, CHAN_VBAT, &raw);
+    adc_cali_raw_to_voltage(misc_cali_h, raw, &mv);
     mv *= 2;
     return mv / 1000.0;
 }
 
-void init_peri_uart(){
+void misc_init_peri_uaer(){
     uart_config_t cfg = {
         .baud_rate = PERI_UART_BAUD,
         .data_bits = UART_DATA_8_BITS,
@@ -64,7 +65,7 @@ void init_peri_uart(){
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, PERI_UART_BUFSIZE, 0, 0, NULL, 0));
 }
 
-void init_i2c(){
+void misc_init_iic(){
     i2c_master_bus_config_t cfg = {
         .i2c_port = I2C_NUM_0,
         .sda_io_num = PIN_IIC_SDA,
@@ -73,10 +74,10 @@ void init_i2c(){
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true
     };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&cfg, &iic_h));
+    ESP_ERROR_CHECK(i2c_new_master_bus(&cfg, &misc_iic_h));
 }
 
-void init_nvs(){
+void misc_init_nvs(){
     esp_err_t ret = nvs_flash_init();
     if (ret==ESP_ERR_NVS_NEW_VERSION_FOUND||ret==ESP_ERR_NVS_NO_FREE_PAGES){
         ESP_LOGW(TAG, "init nvs failed, earse it now. %d", ret);
@@ -86,7 +87,7 @@ void init_nvs(){
     ESP_ERROR_CHECK(ret);
 }
 
-void delay_ms(uint32_t ms){
+void misc_delay_ms(uint32_t ms){
     vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
@@ -104,34 +105,4 @@ int sec_sub(int a, int b){
         return r + 86400;
     }
     return r;
-}
-
-struct SleepInterval *find_inprogress_sleepinterval(struct SleepInterval *itvls, uint8_t len, int now){
-    for (uint8_t i=0; i<len; i++){
-        struct SleepInterval *this = itvls + i;
-        if (this->start==0xffffffff||this->end==0xffffffff){
-            continue;
-        }
-        if (this->start<=now&&now<=this->end){
-            return this;
-        }
-    }
-    return NULL;
-}
-
-struct SleepInterval *find_next_sleepinterval(struct SleepInterval *itvls, uint8_t len, int now){
-    struct SleepInterval *min = NULL;
-    int min_diff = 0;
-    for (uint8_t i=0; i<len; i++){
-        struct SleepInterval *this = itvls + i;
-        if (this->start==0xffffffff||this->end==0xffffffff){
-            continue;
-        }
-        int diff = sec_sub(this->start, now);
-        if (!min||diff<min_diff){
-            min = this;
-            min_diff = diff;
-        }
-    }
-    return min;
 }

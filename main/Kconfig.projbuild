@@ -12,20 +12,9 @@ menu "FuckerDetector config"
     
     endchoice
 
-    choice APP_VER_TYPE
-        prompt "Version type"
-        default APP_VER_TYPE_RELEASE
-
-        config APP_VER_TYPE_DEV
-            bool "Dev"
-
-        config APP_VER_TYPE_SNAPSHOT
-            bool "Snapshot"
-        
-        config APP_VER_TYPE_RELEASE
-            bool "Release"
-                
-    endchoice
+    config APP_IS_DEBUG
+        prompt "Is debug version firmware"
+        default y
 
     menu "Misc"
 
@@ -187,6 +176,15 @@ menu "FuckerDetector config"
             range 0 60000
             default 7000
             depends on APP_SERVER_RADER_UNKNOWN
+
+        config APP_SERVER_AUTOPWOFF_ENABLED
+            bool "Enable low battery voltaget poweroff"
+            default y
+        
+        config APP_SERVER_AUTOPWOFF_LIMIT
+            int "Poweroff voltage (mV)"
+            range 2000 4000
+            default 2700
 
     endmenu
 

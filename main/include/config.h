@@ -5,39 +5,33 @@
 #include "hal/adc_types.h"
 
 #if !defined(CONFIG_IDF_TARGET_ESP32C3)||!CONFIG_IDF_TARGET_ESP32C3
-#error not supported chip
+#   error not supported chip
 #endif
 
-#ifndef CONFIG_APP_SERVER
-#define CONFIG_APP_SERVER 0
-#endif
-
-#ifndef CONFIG_APP_CLIENT
-#define CONFIG_APP_CLIENT 0
+#if CONFIG_APP_SERVER
+#   define CONFIG_APP_CLIENT 0
+#elif CONFIG_APP_CLIENT
+#   define CONFIG_APP_SERVER 0
+#else
+#   error invalid firmware type
 #endif
 
 #ifndef CONFIG_APP_CLIENT_RESPONSE_ENABLED
 #define CONFIG_APP_CLIENT_RESPONSE_ENABLED 0
 #endif /* CONFIG_APP_CLIENT_RESPONSE_ENABLED */
 
-#if CONFIG_APP_SERVER == CONFIG_APP_CLIENT
-#error repeat firmware type
-#elif CONFIG_APP_SERVER
-#define FIRMWARE_TYPE_STRING "Server"
+#if CONFIG_APP_SERVER
+#   define FIRMWARE_TYPE_STRING "Server"
 #elif CONFIG_APP_CLIENT
-#define FIRMWARE_TYPE_STRING "Client"
+#   define FIRMWARE_TYPE_STRING "Client"
 #else
-#error unknown error
+#   error unknown error
 #endif /* CONFIG_APP_SERVER == CONFIG_APP_CLIENT */
 
-#if defined(CONFIG_APP_VER_TYPE_RELEASE)&&CONFIG_APP_VER_TYPE_RELEASE
-#define FIRMWARE_VER_TYPE "Release"
-#elif defined(CONFIG_APP_VER_TYPE_SNAPSHOT)&&CONFIG_APP_VER_TYPE_SNAPSHOT
-#define FIRMWARE_VER_TYPE "Snapshot"
-#elif defined(CONFIG_APP_VER_TYPE_DEV)&&CONFIG_APP_VER_TYPE_DEV
-#define FIRMWARE_VER_TYPE "Dev"
+#ifdef CONFIG_APP_IS_DEBUG
+#   define FIRMWARE_VER_TYPE "Debug"
 #else
-#error unknown error
+#   define FIRMWARE_VER_TYPE "Release"
 #endif
 
 static_assert(

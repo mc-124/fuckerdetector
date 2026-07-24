@@ -17,8 +17,8 @@
 
 // encode vbat value range: [2.2, 4.75]
 
-#define encode_vbat(vbat) ((uint8_t)(((int)(vbat*100.0))-220))
-#define decode_vbat(vbat) ((float)(((int)vbat)+220)/100.0)
+inline uint8_t blelib_encode_vbat(float vbat) {return ((uint8_t)(((int)(vbat*100.0))-220));}
+inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/100.0);}
 
 #if CONFIG_APP_SERVER
 #define APP_BLE_NAME CONFIG_APP_SERVER_BLE_NAME
@@ -27,7 +27,7 @@
 #endif /* CONFIG_APP_SERVER */
 
 #pragma pack(1)
-struct AdvManfacturerData {
+struct blelib_adv_manfacturer_data {
     uint16_t company_id;
     uint8_t type;
     uint8_t encoded_vbat;
@@ -40,12 +40,12 @@ struct AdvManfacturerData {
 #pragma pack()
 
 /// @brief 扫描回调函数指针
-typedef void(*ScanDiscCallbackFuncPtr)(struct ble_gap_ext_disc_desc*);;
+typedef void(*blelib_scan_disc_callback_tFuncPtr)(struct ble_gap_ext_disc_desc*);;
 
 static_assert(
     (0
         +(sizeof(APP_BLE_NAME)+2)               // Adv name
-        +(sizeof(struct AdvManfacturerData)+2)  // ManfacturesData
+        +(sizeof(struct blelib_adv_manfacturer_data)+2)  // ManfacturesData
     ) <= 31,
     "advertising data too big"
 );
@@ -57,25 +57,25 @@ struct PayloadField {
 };
 
 /// @brief 初始化蓝牙控制器 BLE协议栈 GAP服务
-void init_bluetooth();
+void blelib_init();
 
 /// @brief 反初始化蓝牙控制器 BLE协议栈
-void deinit_bluetooth();
+void blelib_deinit();
 
 #endif // FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
 
 #if FIRMWARE_BLE_ADV
 
 /// @brief 初始化广告
-void init_advertising();
+void blelib_adv_init();
 
 /// @brief 开始发送广告
 /// @param data 广告 ManfacturerData
 /// @param adv_time 持续时间（ms）
-void start_advertising(struct AdvManfacturerData *data, uint32_t adv_time);
+void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_time);
 
 /// @brief 停止发送广告
-void stop_advertising();
+void blelib_adv_stop();
 
 #endif // FIRMWARE_BLE_ADV
 
@@ -83,14 +83,14 @@ void stop_advertising();
 
 /// @brief 设置扫描回调
 /// @param func 扫描回调函数指针
-void set_scan_callback(const ScanDiscCallbackFuncPtr func);
+void blelib_scan_set_callback(const blelib_scan_disc_callback_tFuncPtr func);
 
 /// @brief 开始扫描
 /// @param scan_time 扫描时间（ms）
-void start_scan(uint32_t scan_time);
+void blelib_scan_start(uint32_t scan_time);
 
 /// @brief 停止扫描
-void stop_scan();
+void blelib_scan_stop();
 
 /// @brief 迭代 ADStructure 里的每个字段
 /// @param start_ptr 缓冲区起始指针
@@ -98,6 +98,6 @@ void stop_scan();
 /// @param cur_ptr 当前指针
 /// @param result 迭代结果
 /// @return 是否成功
-bool iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result);
+bool blelib_iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result);
 
 #endif // FIRMWARE_BLE_SCAN

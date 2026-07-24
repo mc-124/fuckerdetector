@@ -5,7 +5,7 @@
 typedef void(*ReplFuncPtr)(uint8_t, const char**);
 
 /// @brief 初始化 REPL
-void init_repl();
+void repl_init();
 
 void __add_command(const char *name, const char *prompt, ReplFuncPtr func);
 
@@ -16,4 +16,4 @@ void __add_command(const char *name, const char *prompt, ReplFuncPtr func);
 #define add_command(strName, strPrompt, pFunc) __add_command(strName "", strPrompt "", pFunc)
 
 /// @brief 进入 REPL
-[[noreturn]] void begin_repl();
+[[noreturn]] void repl_begin();

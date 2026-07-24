@@ -2,14 +2,13 @@
 
 #if CONFIG_APP_SERVER&&CONFIG_APP_SERVER_RADER_HLKLD1040
 
-#define RADER_OK_TIME 7000+1000
-
 #include "misc.h"
 #include "repl.h"
 
-#include "string.h"
+#include <string.h>
 #include "driver/uart.h"
 #include "esp_timer.h"
+#include "esp_sleep.h"
 
 #define LD1040_UART_BAUD 9600
 #define RECV_CMD_TIMEOUT 2000 /* ms */
@@ -57,7 +56,7 @@ static const uint8_t RESP_SET_TH[] = {
 
 };
 
-static bool receive_data(uint8_t *buf, uint8_t len){
+static bool raderctl_recv_bytes(uint8_t *buf, uint8_t len){
     uint8_t curlen = 0;
     int64_t start_time = get_millis();
     for (;;){
@@ -70,15 +69,15 @@ static bool receive_data(uint8_t *buf, uint8_t len){
     }
 }
 
-static bool rader_ready(){
-    return RADER_OK_TIME < get_millis();
+static bool raderctl_rader_ready(){
+    return CONFIG_APP_SERVER_RADER_PWRON_DURATION+500 < get_millis();
 }
 
-static void init_rader(){
+static void raderctl_init_rader(){
     uart_flush_input(UART_NUM_1);
     uart_write_bytes(UART_NUM_1, INST_SET_MOVING_MODE, sizeof(INST_SET_MOVING_MODE));
     uint8_t resp_buf[sizeof(INST_SET_MOVING_MODE)];
-    if (receive_data(resp_buf, sizeof(resp_buf))){
+    if (raderctl_recv_bytes(resp_buf, sizeof(resp_buf))){
         if (!memcmp(resp_buf, INST_SET_MOVING_MODE, sizeof(resp_buf))){
             println("success");
         } else {
@@ -93,11 +92,11 @@ static void init_rader(){
     }
 }
 
-static int query_rader_th(){
+static int raderctl_query_th(){
     uart_flush_input(UART_NUM_1);
     uart_write_bytes(UART_NUM_1, INST_QUERY_CONFIG, sizeof(INST_QUERY_CONFIG));
     uint8_t resp_buf[0x19];
-    if (receive_data(resp_buf, sizeof(resp_buf))){
+    if (raderctl_recv_bytes(resp_buf, sizeof(resp_buf))){
         if (!memcmp(INST_QUERY_CONFIG, resp_buf, 2) // 帧头
             &&resp_buf[2] == 0x19 // 长度
             &&resp_buf[3] == 0xFA // 操作码
@@ -119,7 +118,7 @@ static int query_rader_th(){
     }
 }
 
-static void set_rader_th(int th){
+static void raderctl_set_th(int th){
     uart_flush_input(UART_NUM_1);
     uart_write_bytes(UART_NUM_1, INST_SET_TH_A, sizeof(INST_SET_TH_A));
     uint8_t resp_buf[sizeof(RESP_SET_TH)] = {
@@ -129,7 +128,7 @@ static void set_rader_th(int th){
     };
     uart_write_bytes(UART_NUM_1, resp_buf, 3);
     uart_write_bytes(UART_NUM_1, INST_SET_TH_B, sizeof(INST_SET_TH_B));
-    if (receive_data(resp_buf, 7)){
+    if (raderctl_recv_bytes(resp_buf, 7)){
         if (!memcmp(resp_buf, RESP_SET_TH, sizeof(RESP_SET_TH))){
             println("set success");
         } else {
@@ -144,10 +143,10 @@ static void set_rader_th(int th){
         println("error: set timeout");
         return;
     }
-    delay_ms(50);
+    misc_delay_ms(50);
     println("verify config");
     // 验证值
-    int recv_th = query_rader_th();
+    int recv_th = raderctl_query_th();
     if (recv_th!=-1){
         if (th==recv_th){
             println("success");
@@ -160,12 +159,12 @@ static void set_rader_th(int th){
 }
 
 static void cmd_raderctl(uint8_t argc, const char **args){
-    if (!rader_ready()){
+    if (!raderctl_rader_ready()){
         do {
             println("Waiting rader ready ...");
-            delay_ms(1000);
-        } while (!rader_ready());
-        delay_ms(500);
+            misc_delay_ms(1000);
+        } while (!raderctl_rader_ready());
+        misc_delay_ms(500);
     }
     if (argc==0){
         printf("Usage:\r\n"
@@ -175,9 +174,9 @@ static void cmd_raderctl(uint8_t argc, const char **args){
         );
     } else if (argc==1){
         if (!strcmp(args[0], "init")){
-            init_rader();
+            raderctl_init_rader();
         } else if (!strcmp(args[0], "query-th")){
-            int th = query_rader_th();
+            int th = raderctl_query_th();
             if (th!=-1){
                 printfln("threshold: %d", th);
             }
@@ -193,15 +192,18 @@ static void cmd_raderctl(uint8_t argc, const char **args){
             println("error: invalid number");
             return;
         }
-        set_rader_th(th);
+        raderctl_set_th(th);
     } else {
         println("error: invalid arguments");
     }
 }
 
-void __init_raderctl(){
-    init_peri_uart();
-    peripheral_pw(true);
+void __raderctl_init(){
+    misc_init_peri_uaer();
+    gpio_deep_sleep_hold_dis();
+    gpio_hold_dis(PIN_OUTPUT);
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    gpio_set_level(PIN_OUTPUT, 1);
     add_command("raderctl", "Query or set rader settings", cmd_raderctl);
 }
 
