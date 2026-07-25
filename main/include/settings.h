@@ -10,6 +10,8 @@ void settings_init();
 void settings_load();
 /// @brief 保存设置
 void settings_store();
+/// @brief 为 REPL 添加命令
+void settings_addcmds();
 
 #define SETTINGS_NAMESPACE "servercfg"
 //////////////////// Server Settings

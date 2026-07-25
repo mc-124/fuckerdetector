@@ -58,7 +58,7 @@ static void cmd_version(uint8_t argc, const char**){
         println("error: invalid arguments");
         return;
     }
-    printf( "# FuckerDetector"
+    printf( "# FuckerDetector\r\n"
         "version: " FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION "\r\n"
         "idf version: " CONFIG_IDF_INIT_VERSION "\r\n"
         "compiler: " COMPILER_VERSION "\r\n"
@@ -101,7 +101,7 @@ static void cmd_exit(uint8_t argc, const char **args){
 
 #pragma endregion 内置命令
 
-void repl_add_command(const char *name, const char *prompt, ReplFuncPtr func){
+void __repl_addcmd(const char *name, const char *prompt, ReplFuncPtr func){
     assert(name);
     assert(prompt);
     assert(func);
@@ -151,9 +151,9 @@ void repl_init(){
     }
     ctx->cmdc = 0;
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 256, 256, 0, NULL, 0));
-    add_command("help", "Print information for help", cmd_help);
-    add_command("version", "Print firmware version", cmd_version);
-    add_command("exit", "Exit REPL and reset chip", cmd_exit);
+    repl_addcmd("help", "Print information for help", cmd_help); // #1
+    repl_addcmd("version", "Print firmware version", cmd_version); // #2
+    repl_addcmd("exit", "Exit REPL and reset chip", cmd_exit); // #3
 }
 
 #define is_valid_char(__b) (32<__b&&__b<127)
@@ -164,10 +164,10 @@ void repl_init(){
     } while (0);
 #define pr_beep() \
     do {                \
-        gpio_set_level(PIN_LED, 1);         \
+        led(0);         \
         pr_char(7);     \
         misc_delay_ms(20);   \
-        gpio_set_level(PIN_LED, 0);         \
+        led(1);         \
     } while(0)
 #define pr_backspace() \
     do {                \
@@ -255,7 +255,7 @@ static void repl_proc_byte(char byte){
 
 [[noreturn]] void repl_begin(){
     assert(ctx);
-    gpio_set_level(PIN_LED, 0);
+    led(1);
     esp_task_wdt_deinit();
     println("Type \"help\" for more information.");
     pr_repl_prompt();

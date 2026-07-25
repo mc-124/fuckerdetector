@@ -3,6 +3,7 @@
 #if CONFIG_APP_SERVER
 
 #include "misc.h"
+#include "esp_log.h"
 static const char *TAG = "timelib";
 
 #if CONFIG_APP_SERVER_RTC_DS3231
@@ -11,17 +12,13 @@ static const char *TAG = "timelib";
 
 #include <assert.h>
 
-static i2c_dev_t timelib_rtc_h = {
-    .cfg = {
-        .master = {
-            .clk_speed = CONFIG_APP_I2C_SPEED * 1000
-        }
-    }
-};
+static i2c_dev_t timelib_rtc_h = {0};
 
 struct timelib_slpitvl timelib_slpitvl_array[CONFIG_APP_SERVER_SLPITVL_MAX_NUM];
 
 void timelib_init(){
+    ESP_LOGI(TAG, "init RTC");
+    ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(
         ds3231_init_desc(&timelib_rtc_h, I2C_NUM_0, PIN_IIC_SDA, PIN_IIC_SCL)
     );
@@ -95,7 +92,7 @@ void timelib_print_slpitvl(const struct timelib_slpitvl *slpitvl){
     if (slpitvl->start!=FFFF_U32&&slpitvl->end!=FFFF_U32){
         printfln("(%02hhu:%02hhu:%02hhu -> %02hhu:%02hhu:%02hhu)",
             slpitvl->start/3600, (slpitvl->start%3600)/60, slpitvl->start%60,
-            slpitvl->end/3600, (slpitvl->start%3600)/60, slpitvl->start%60
+            slpitvl->end/3600, (slpitvl->end%3600)/60, slpitvl->end%60
         );
     } else {
         println("(free)");

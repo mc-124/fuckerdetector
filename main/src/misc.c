@@ -106,3 +106,16 @@ int sec_sub(int a, int b){
     }
     return r;
 }
+
+bool misc_str_to_int(int *out, const char *str){
+    assert(str);
+    uint8_t len = strlen(str);
+    char *p_end;
+    int result = strtol(str, &p_end, 10);
+    if (((uint32_t)p_end)==((uint32_t)str)+len){
+        *out = result;
+        return true;
+    } else {
+        return false;
+    }
+}

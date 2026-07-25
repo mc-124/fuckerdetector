@@ -185,26 +185,24 @@ static void cmd_raderctl(uint8_t argc, const char **args){
             return;
         }
     } else if (argc==2&&!strcmp(args[0], "set-th")){
-        uint8_t len = strlen(args[1]);
-        char *ep;
-        int th = strtol(args[1], &ep, 10);
-        if (((size_t)ep)!=((size_t)args[1])+len){
-            println("error: invalid number");
-            return;
+        int th;
+        if (misc_str_to_int(&th, args[1])){
+            raderctl_set_th(th);
+        } else {
+            printfln("error: invalid number: %s", args[1]);
         }
-        raderctl_set_th(th);
     } else {
         println("error: invalid arguments");
     }
 }
 
-void __raderctl_init(){
+void raderctl_addcmds(){
     misc_init_peri_uaer();
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis(PIN_OUTPUT);
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     gpio_set_level(PIN_OUTPUT, 1);
-    add_command("raderctl", "Query or set rader settings", cmd_raderctl);
+    repl_addcmd("raderctl", "Query or set rader settings", cmd_raderctl); // #4
 }
 
 #endif // CONFIG_APP_SERVER&&CONFIG_APP_SERVER_RADER_HLKLD1040

@@ -119,7 +119,8 @@ void blelib_deinit(){
     }
     ESP_ERROR_CHECK(nimble_port_deinit());
     nimble_port_freertos_deinit();
-    ESP_ERROR_CHECK(esp_bt_controller_deinit());
+    /// @note nimble_port_deinit 里面已经调用了这个
+    //ESP_ERROR_CHECK(esp_bt_controller_deinit());
 }
 
 #endif // FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
@@ -181,7 +182,7 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
     blelib_add_data_to_payload(payload, &payload_len, BLE_HS_ADV_TYPE_COMP_NAME, sizeof(APP_BLE_NAME)-1, (void*)APP_BLE_NAME); // Name
     blelib_add_data_to_payload(payload, &payload_len, BLE_HS_ADV_TYPE_MFG_DATA, sizeof(struct blelib_adv_manfacturer_data), data); // ManfacturerData
 
-    printfln("payload_len = %d", payload_len);
+    //printfln("payload_len = %d", payload_len);
 
     ret = os_mbuf_append(mbuf, payload, payload_len);
     if (ret){
@@ -199,7 +200,8 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
     if (ret){
         ESP_LOGE(TAG, "start adv failed: %d", ret);
     }
-    println("advertising started");
+    //println("advertising started");
+    ESP_LOGI(TAG, "advertising started");
 }
 
 void blelib_adv_stop(){

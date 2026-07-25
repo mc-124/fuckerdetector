@@ -2,6 +2,7 @@
 
 #include "misc.h"
 #include "timelib.h"
+#include "repl.h"
 
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -98,6 +99,102 @@ void settings_store(){
     } else {
         ESP_LOGI(TAG, "No change");
     }
+}
+
+// addsleep <str start HH:MM:SS/HH:MM> <str end HH:MM:SS/HH:MM>
+static void cmd_addsleep(uint8_t argc, const char **args){
+    if (argc==0){
+        println("Usage: addsleep <start_time: HH:MM|HH:MM:SS> <end_time: HH:MM|HH:MM:SS>");
+        return;
+    } else if (argc!=2){
+        println("error: invalid arguments");
+        return;
+    }
+
+    // 这里不是 bug 是故意的
+    uint8_t start_hour, start_minute, start_second = 0;
+    uint8_t end_hour, end_minute, end_second = 0;
+
+    if (sscanf(args[0], "%hhu:%hhu:%hhu", &start_hour, &start_minute, &start_second)<2
+        ||start_hour>=24||start_minute>=60||start_second>=60
+    ){
+        println("error: invalid start time");
+        return;
+    }
+
+    if (sscanf(args[1], "%hhu:%hhu:%hhu", &end_hour, &end_minute, &end_second)<2
+        ||end_hour>=24||end_minute>=60||end_second>=60
+    ){
+        println("error: invalid end time");
+        return;
+    }
+
+    int start_time = start_hour*3600 + start_minute*60 + start_second;
+    int end_time = end_hour*3600 + end_minute*60 + end_second;
+    
+    struct timelib_slpitvl *freeslot = NULL;
+    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+        struct timelib_slpitvl *this = timelib_slpitvl_array+i;
+        if (this->start==FFFF_U32||this->end==FFFF_U32){
+            freeslot = this;
+            break;
+        }
+    }
+    if (!freeslot){
+        println("error: array is full");
+        return;
+    }
+
+    freeslot->start = start_time;
+    freeslot->end = end_time;
+
+    printf("success: ");
+    timelib_print_slpitvl(freeslot);
+}
+
+// delsleep <int slot>
+static void cmd_delsleep(uint8_t argc, const char **args){
+    if (argc==0){
+        println("Usage: delsleep <index>");
+        return;
+    } else if (argc!=1){
+        println("error: invalid arguments");
+        return;
+    }
+    int index;
+    if (!misc_str_to_int(&index, args[0])){
+        printfln("error: invalid number: %s", args[0]);
+    }
+    if (0<=index&&index<CONFIG_APP_SERVER_SLPITVL_MAX_NUM){
+        memset(timelib_slpitvl_array+index, 0xff, sizeof(struct timelib_slpitvl));
+        println("success");
+    } else {
+        println("error: index out of range");
+    }
+}
+
+static void cmd_lssleep(uint8_t argc, const char **args){
+    if (argc){
+        println("error: invalid arguments");
+        return;
+    }
+    timelib_print_all_slpitvl();
+}
+
+static void cmd_savesleep(uint8_t argc, const char **args){
+    if (argc){
+        println("error: invalid arguments");
+        return;
+    }
+    settings_store();
+    println("success");
+}
+
+void settings_addcmds(){
+    repl_addcmd("addsleep", "Add sleep interval", cmd_addsleep); // #5
+    repl_addcmd("delsleep", "Delete a sleep interval", cmd_delsleep); // #6
+    repl_addcmd("lssleep", "Print all sleep interval", cmd_lssleep); // #7
+    repl_addcmd("savesleep", "Save all sleep interval", cmd_savesleep); // #8
 }
 
 #elif CONFIG_APP_CLIENT

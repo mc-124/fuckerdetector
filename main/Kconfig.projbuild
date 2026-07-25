@@ -12,10 +12,6 @@ menu "FuckerDetector config"
     
     endchoice
 
-    config APP_IS_DEBUG
-        prompt "Is debug version firmware"
-        default y
-
     menu "Misc"
 
         config APP_BLE_COMPANY_ID
@@ -107,11 +103,6 @@ menu "FuckerDetector config"
 
     menu "Server"
 
-        config APP_SERVER_I2C_SPEED
-            int "I2C bus speed (KHz)"
-            range 10 400
-            default 100
-
         config APP_SERVER_BLE_NAME
             string "Advertising name (length <= 16 char)"
             default "srvV2"
@@ -185,7 +176,7 @@ menu "FuckerDetector config"
             int "Poweroff voltage (mV)"
             range 2000 4000
             default 2700
-
+            depends on APP_SERVER_AUTOPWOFF_ENABLED
     endmenu
 
 endmenu

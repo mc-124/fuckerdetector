@@ -4,7 +4,6 @@
     - choice `Firmware type` 固件类型
         - bool `Server` 编译服务端（探测器）的固件
         - bool `Client` 编译客户端（接收器）的固件
-    - bool `Is debug version firmware` 没啥用的东西只是改变一个字符串
     - menu `Misc` 杂项设置
         - hex `Advertising company_id field value` 广告包中厂商信息字段的值
         - hex `Protocol version` 协议版本号

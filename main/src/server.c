@@ -14,14 +14,16 @@
 
 static const char* TAG = "main";
 
+
 void app_init(){
     println(FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
 
     misc_gpio_init(PIN_FUNCT, GPIO_MODE_INPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);    misc_gpio_init(PIN_OUTPUT, GPIO_MODE_OUTPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);
+    
     misc_gpio_init(PIN_LED, GPIO_MODE_OUTPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);
-#if CONFIG_APP_CLI_ENABLED
+    led(0);
+
     misc_gpio_init(PIN_CMDLINE, GPIO_MODE_INPUT, GPIO_PULLUP_ONLY, GPIO_INTR_DISABLE);
-#endif
 
     misc_vbat_init();
     misc_init_nvs();
@@ -33,17 +35,22 @@ void app_init(){
     
     if (gpio_get_level(PIN_CMDLINE)==0){
         repl_init();
-        raderctl_init();
+        raderctl_addcmds();
+        settings_addcmds();
         repl_begin();
     }
 }
 
 /// @brief 等待雷达就绪
 static void app_wait_rader_ready(){
-    esp_sleep_enable_timer_wakeup(1000000); // 1s
-    while (get_millis()<CONFIG_APP_SERVER_RADER_PWRON_DURATION+500) {
+    esp_sleep_enable_timer_wakeup(1000*CONFIG_APP_SERVER_RADER_PWRON_DURATION); // 1s
+    gpio_hold_en(PIN_OUTPUT);
+    esp_light_sleep_start();
+    esp_sleep_enable_timer_wakeup(1000000);
+    while (gpio_get_level(PIN_OUTPUT)) {
         esp_light_sleep_start();
     }
+    gpio_hold_dis(PIN_OUTPUT);
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
 }
 
@@ -95,7 +102,6 @@ static void app_rader_pwron(){
 /// @param gpio_wakeupable 是否可由 GPIO 唤醒
 [[noreturn]] static void app_begin_sleep(uint32_t duration, bool gpio_wakeupable){
     ESP_LOGI(TAG, "begin sleep. duration=%u gpio_wakeupable=%hhu", duration, gpio_wakeupable);
-    blelib_deinit();
     esp_sleep_enable_timer_wakeup(duration*1000000);
     if (gpio_wakeupable){
         esp_sleep_enable_gpio_wakeup_on_hp_periph_powerdown(1ULL<<PIN_FUNCT, ESP_GPIO_WAKEUP_GPIO_HIGH);
@@ -122,18 +128,34 @@ static void app_transmit_alarm(float vbat, int now){
     blelib_adv_start(&mfdata, CONFIG_APP_SERVER_ADV_DURATION);
     misc_delay_ms(CONFIG_APP_SERVER_ADV_DURATION);
     blelib_adv_stop();
+    blelib_deinit();
+}
+
+/// @brief 检查电池电压 太低就永久深度睡眠
+static void app_check_vbat(float vbat){
+#if CONFIG_APP_SERVER_AUTOPWOFF_ENABLED
+    float limit = CONFIG_APP_SERVER_AUTOPWOFF_LIMIT/1000.0;
+    if (vbat<=limit){
+        ESP_LOGE(TAG, "low battery voltage: %f", vbat);
+        gpio_deep_sleep_hold_dis();
+        gpio_hold_dis(PIN_OUTPUT);
+        esp_deep_sleep_start();
+    }
+#endif
 }
 
 void app_main(){
     app_init();
     ESP_LOGI(TAG, "end init");
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    
+    float vbat = misc_vbat_read();
+    ESP_LOGI(TAG, "vbat: %f", vbat);
+    app_check_vbat(vbat);
 
     int now = timelib_get_day_sec();
     ESP_LOGI(TAG, "now: %d", now);
 
-    float vbat = misc_vbat_read();
-    ESP_LOGI(TAG, "vbat: %f", vbat);
 
     if (app_wakeup_by_rader()){
         ESP_LOGI(TAG, "wakeup by rader");
@@ -153,7 +175,7 @@ void app_main(){
     if (next_slpitvl){
         ESP_LOGI(TAG, "found next sleep interval");
         timelib_logprint_slpitvl(next_slpitvl);
-        uint32_t sleep_duration = sec_sub(inprog_slpitvl->start, now);
+        uint32_t sleep_duration = sec_sub(next_slpitvl->start, now);
         app_rader_pwron();
         app_begin_sleep(sleep_duration, 1);
     }
