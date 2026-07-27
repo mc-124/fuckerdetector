@@ -185,9 +185,9 @@ static void cmd_raderctl(uint8_t argc, const char **args){
             return;
         }
     } else if (argc==2&&!strcmp(args[0], "set-th")){
-        int th;
-        if (misc_str_to_int(&th, args[1])){
-            raderctl_set_th(th);
+        uint32_t th;
+        if (misc_str_to_uint(&th, args[1])){
+            raderctl_set_th(th&0x00ffffff);
         } else {
             printfln("error: invalid number: %s", args[1]);
         }

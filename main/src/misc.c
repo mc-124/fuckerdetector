@@ -8,6 +8,10 @@
 #include "nvs_flash.h"
 #include "esp_sleep.h"
 
+#if CONFIG_APP_CLIENT
+#include "driver/ledc.h"
+#endif
+
 static const char* TAG = "Misc";
 
 static adc_oneshot_unit_handle_t misc_adc_h;
@@ -119,3 +123,57 @@ bool misc_str_to_int(int *out, const char *str){
         return false;
     }
 }
+
+bool misc_str_to_uint(uint32_t *out, const char *str){
+    assert(str);
+    uint8_t len = strlen(str);
+    char *p_end;
+    int result = strtoul(str, &p_end, 10);
+    if (((uint32_t)p_end)==((uint32_t)str)+len){
+        *out = result;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+#if CONFIG_APP_CLIENT
+
+void misc_vibration_init(){
+    ESP_LOGI(TAG, "init ledc");
+    ledc_timer_config_t cfg = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_13_BIT,
+        .timer_num = LEDC_TIMER_0,
+        .freq_hz = CONFIG_APP_CLIENT_VIBRATION_PWM_FREQ,
+        .clk_cfg = LEDC_AUTO_CLK
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&cfg));
+    ledc_channel_config_t chan = {
+        .gpio_num = PIN_OUTPUT,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = LEDC_CHANNEL_0,
+        .timer_sel = LEDC_TIMER_0,
+        .duty = 0,
+        .hpoint = 0
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&chan));
+}
+
+void misc_vibration_set(uint8_t pwr){
+    ESP_LOGI(TAG, "vibration: pwr=%hhu", pwr);
+    if (!pwr){
+        ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+        ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+        return;
+    } else if (pwr>100){
+        pwr = 100;
+    }
+    float fpwr = ((float)pwr) * 0.01;
+    uint32_t duty = fpwr*(1<<13);
+    ledc_timer_resume(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty));
+    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
+}
+
+#endif

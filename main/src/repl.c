@@ -15,7 +15,7 @@ struct repl_command {
     uint32_t name_crc32;
     const char *name;
     const char *prompt;
-    ReplFuncPtr func;
+    repl_cmd_callback_func_t func;
 };
 
 struct repl_context {
@@ -37,7 +37,7 @@ static const struct repl_command *repl_find_command(const char *name, uint8_t na
     }
     uint32_t name_crc32 = esp_crc32_le(REPL_CRC32_DEFAULT, (const uint8_t*)name, name_len);
     for (uint8_t i=0; i<ctx->cmdc; i++){
-        const struct repl_command *cmd = ctx->cmds + i;
+        const struct repl_command *cmd = &ctx->cmds[i];
         if (!cmd->func){
             continue;
         }
@@ -78,7 +78,7 @@ static void cmd_help(uint8_t argc, const char **args){
     } else if (argc==0){
         println("-------- HELP --------");
         for (uint8_t i=0; i<REPL_MAX_CMDS; i++){
-            const struct repl_command *cmd = ctx->cmds+i;
+            const struct repl_command *cmd = &ctx->cmds[i];
             if (cmd->func){
                 printfln("- (%s): %s", cmd->name, cmd->prompt);
             }
@@ -101,7 +101,7 @@ static void cmd_exit(uint8_t argc, const char **args){
 
 #pragma endregion 内置命令
 
-void __repl_addcmd(const char *name, const char *prompt, ReplFuncPtr func){
+void __repl_addcmd(const char *name, const char *prompt, repl_cmd_callback_func_t func){
     assert(name);
     assert(prompt);
     assert(func);
@@ -256,7 +256,8 @@ static void repl_proc_byte(char byte){
 [[noreturn]] void repl_begin(){
     assert(ctx);
     led(1);
-    esp_task_wdt_deinit();
+    // CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU 被关了应该不会炸了
+    //esp_task_wdt_deinit(); 
     println("Type \"help\" for more information.");
     pr_repl_prompt();
     for (;;){

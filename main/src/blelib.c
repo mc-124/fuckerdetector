@@ -29,7 +29,7 @@ static uint8_t blelib_addr_val[6] = {0};
 static_assert(sizeof(blelib_addr_val)==6, "MAC buffer error");
 
 #if FIRMWARE_BLE_SCAN
-static blelib_scan_disc_callback_tFuncPtr scan_callback_func = NULL;
+static blelib_scan_disc_callback_t scan_callback_func = NULL;
 #endif // FIRMWARE_BLE_SCAN
 
 /// @brief NimBLE 事件回调函数
@@ -219,7 +219,7 @@ void blelib_adv_stop(){
 
 #if FIRMWARE_BLE_SCAN
 
-void blelib_scan_set_callback(const blelib_scan_disc_callback_tFuncPtr func){
+void blelib_scan_set_callback(const blelib_scan_disc_callback_t func){
     if (!func){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
     }

@@ -19,14 +19,13 @@ void app_init(){
     println(FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
 
     misc_gpio_init(PIN_FUNCT, GPIO_MODE_INPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);    misc_gpio_init(PIN_OUTPUT, GPIO_MODE_OUTPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);
-    
+
     misc_gpio_init(PIN_LED, GPIO_MODE_OUTPUT, GPIO_FLOATING, GPIO_INTR_DISABLE);
     led(0);
 
     misc_gpio_init(PIN_CMDLINE, GPIO_MODE_INPUT, GPIO_PULLUP_ONLY, GPIO_INTR_DISABLE);
 
     misc_vbat_init();
-    misc_init_nvs();
 
     timelib_init();
 

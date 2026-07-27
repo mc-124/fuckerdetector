@@ -22,9 +22,9 @@ inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/1
 
 #if CONFIG_APP_SERVER
 #define APP_BLE_NAME CONFIG_APP_SERVER_BLE_NAME
-#else
-#define APP_BLE_NAMe CONFIG_APP_CLIENT_BLE_NAME
-#endif /* CONFIG_APP_SERVER */
+#elif CONFIG_APP_CLIENT
+#define APP_BLE_NAME CONFIG_APP_CLIENT_BLE_NAME
+#endif
 
 #pragma pack(1)
 struct blelib_adv_manfacturer_data {
@@ -40,7 +40,7 @@ struct blelib_adv_manfacturer_data {
 #pragma pack()
 
 /// @brief 扫描回调函数指针
-typedef void(*blelib_scan_disc_callback_tFuncPtr)(struct ble_gap_ext_disc_desc*);;
+typedef void(*blelib_scan_disc_callback_t)(struct ble_gap_ext_disc_desc*);;
 
 static_assert(
     (0
@@ -83,7 +83,7 @@ void blelib_adv_stop();
 
 /// @brief 设置扫描回调
 /// @param func 扫描回调函数指针
-void blelib_scan_set_callback(const blelib_scan_disc_callback_tFuncPtr func);
+void blelib_scan_set_callback(const blelib_scan_disc_callback_t func);
 
 /// @brief 开始扫描
 /// @param scan_time 扫描时间（ms）

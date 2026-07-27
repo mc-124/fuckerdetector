@@ -6,14 +6,16 @@
 
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include <assert.h>
 
 static const char *TAG = "settings";
+
+static nvs_handle_t ns_h = {0};
 
 #if CONFIG_APP_SERVER
 
 static char settings_nvs_key[sizeof(SETTINGS_SERVER_SLEEP_INTERVAL)+2];
 static struct timelib_slpitvl settings_old_slpitvl_array[CONFIG_APP_SERVER_SLPITVL_MAX_NUM];
-static nvs_handle_t ns_h = {0};
 
 static void set_nvs_sleepinterval_index(uint8_t index){
     snprintf(((char*)settings_nvs_key)+sizeof(settings_nvs_key)-3, 3, "%02hhX", index);
@@ -31,6 +33,7 @@ void settings_reset_all_timelib_slpitvl_array(){
 
 void settings_init(){
     ESP_LOGI(TAG, "init");
+    misc_init_nvs();
     memset(timelib_slpitvl_array, 0xff, sizeof(struct timelib_slpitvl)*CONFIG_APP_SERVER_SLPITVL_MAX_NUM);
     memset(settings_old_slpitvl_array, 0xff, sizeof(struct timelib_slpitvl)*CONFIG_APP_SERVER_SLPITVL_MAX_NUM);
     memcpy(settings_nvs_key, SETTINGS_SERVER_SLEEP_INTERVAL "\0\0", sizeof(SETTINGS_SERVER_SLEEP_INTERVAL)+2);
@@ -59,9 +62,8 @@ void settings_init(){
 
 void settings_load(){
     ESP_LOGI(TAG, "loading settings");
-    timelib_check_slpitvl();
     for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
-        struct timelib_slpitvl *si = timelib_slpitvl_array + i;
+        struct timelib_slpitvl *si = &timelib_slpitvl_array[i];
         uint64_t u64 = FFFF_U64;
         set_nvs_sleepinterval_index(i);
         esp_err_t ret = nvs_get_u64(ns_h, settings_nvs_key, &u64);
@@ -74,6 +76,7 @@ void settings_load(){
         }
         memcpy(si, &u64, 8);
     }
+    timelib_check_slpitvl();
     memcpy(settings_old_slpitvl_array, timelib_slpitvl_array, sizeof(timelib_slpitvl_array));
 }
 
@@ -82,8 +85,8 @@ void settings_store(){
     timelib_check_slpitvl();
     bool changed = false;
     for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
-        struct timelib_slpitvl *si = timelib_slpitvl_array + i;
-        if (!memcmp(si, settings_old_slpitvl_array+i, 8)) 
+        struct timelib_slpitvl *si = &timelib_slpitvl_array[i];
+        if (!memcmp(si, &settings_old_slpitvl_array[i], 8)) 
             continue;
         uint64_t u64;
         memcpy(&u64, si, 8);
@@ -115,15 +118,18 @@ static void cmd_addsleep(uint8_t argc, const char **args){
     uint8_t start_hour, start_minute, start_second = 0;
     uint8_t end_hour, end_minute, end_second = 0;
 
-    if (sscanf(args[0], "%hhu:%hhu:%hhu", &start_hour, &start_minute, &start_second)<2
+    uint32_t endi = 0;
+    if (sscanf(args[0], "%hhu:%hhu:%hhu%n", &start_hour, &start_minute, &start_second, &endi)<2
         ||start_hour>=24||start_minute>=60||start_second>=60
+        ||args[0][endi]!=0
     ){
         println("error: invalid start time");
         return;
     }
 
-    if (sscanf(args[1], "%hhu:%hhu:%hhu", &end_hour, &end_minute, &end_second)<2
+    if (sscanf(args[1], "%hhu:%hhu:%hhu%n", &end_hour, &end_minute, &end_second, &endi)<2
         ||end_hour>=24||end_minute>=60||end_second>=60
+        ||args[0][endi]!=0
     ){
         println("error: invalid end time");
         return;
@@ -134,7 +140,7 @@ static void cmd_addsleep(uint8_t argc, const char **args){
     
     struct timelib_slpitvl *freeslot = NULL;
     for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
-        struct timelib_slpitvl *this = timelib_slpitvl_array+i;
+        struct timelib_slpitvl *this = &timelib_slpitvl_array[i];
         if (this->start==FFFF_U32||this->end==FFFF_U32){
             freeslot = this;
             break;
@@ -161,11 +167,12 @@ static void cmd_delsleep(uint8_t argc, const char **args){
         println("error: invalid arguments");
         return;
     }
-    int index;
-    if (!misc_str_to_int(&index, args[0])){
+    uint32_t index;
+    if (!misc_str_to_uint(&index, args[0])){
         printfln("error: invalid number: %s", args[0]);
+        return;
     }
-    if (0<=index&&index<CONFIG_APP_SERVER_SLPITVL_MAX_NUM){
+    if (index<CONFIG_APP_SERVER_SLPITVL_MAX_NUM){
         memset(timelib_slpitvl_array+index, 0xff, sizeof(struct timelib_slpitvl));
         println("success");
     } else {
@@ -198,5 +205,263 @@ void settings_addcmds(){
 }
 
 #elif CONFIG_APP_CLIENT
+
+struct settings settings;
+
+#define MS_TO_VIB(ms) ((uint8_t)(ms/20-1))
+
+const static struct settings settings_default = {
+    .enable_recv_server_alarm = true,
+    .vib_normal_num = 3-1,
+    .vib_normal_dur = MS_TO_VIB(1000),
+    .vib_normal_itv = MS_TO_VIB(500),
+    .enable_recv_client_alarm = true,
+    .vib_normal_pwr = 20-1,
+    .enable_recv_client_violance_alarm = true,
+    .vib_violance_num = 2,
+    .vib_violance_dur = MS_TO_VIB(1500),
+    .vib_violance_itv = MS_TO_VIB(800),
+    .server_alarm_as_violance = true,
+    .vib_violance_pwr = 70-1,
+};
+static_assert(sizeof(struct settings)==8);
+
+#if CONFIG_APP_CLIENT_USE_ZH
+#define TEXT_0 "接收探测器警告"
+#define TEXT_1 "接收客户端警告"
+#define TEXT_2 "接收客户端暴力"
+#define TEXT_3 "探测器使用暴力"
+#define TEXT_4 "警告震动次数"
+#define TEXT_5 "警告震动时长"
+#define TEXT_6 "警告震动间隔"
+#define TEXT_7 "警告震动功率"
+#define TEXT_8 "暴力震动次数"
+#define TEXT_9 "暴力震动时长"
+#define TEXT_A "暴力震动间隔"
+#define TEXT_B "暴力震动功率"
+#else
+#define TEXT_0 "recv srv alarm", 
+#define TEXT_1 "recv cli alarm", 
+#define TEXT_2 "recv cli ALARM", 
+#define TEXT_3 "srv use ALARM",   
+#define TEXT_4 "alarm loop num"
+#define TEXT_5 "alarm duration"
+#define TEXT_6 "alarm interval"
+#define TEXT_7 "alarm power"
+#define TEXT_8 "ALARM loop num"
+#define TEXT_9 "ALARM duration"
+#define TEXT_A "ALARM interval"
+#define TEXT_B "ALARM power"
+#endif
+
+const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM] = {
+    {TEXT_0, 0,1,0,1},
+    {TEXT_1, 0,1,0,1},
+    {TEXT_2, 0,1,0,1},
+    {TEXT_3, 0,1,0,1},
+
+    {TEXT_4, 1,1,0,127},
+    {TEXT_5, 1,20,0,127},
+    {TEXT_6, 1,20,0,127},
+    {TEXT_7, 0,1,1,100},
+    
+    {TEXT_8, 1,1,0,127},
+    {TEXT_9, 1,20,0,127},
+    {TEXT_A, 1,20,0,127},
+    {TEXT_B, 0,1,1,100}    
+};
+
+void settings_init(){
+    ESP_LOGI(TAG, "init");
+    misc_init_nvs();
+    esp_err_t ret = nvs_open(SETTINGS_NAMESPACE, NVS_READWRITE, &ns_h);
+    if (ret&&ret!=ESP_ERR_NVS_NOT_FOUND){
+        ESP_LOGE(TAG, "open nvs failed");
+        ESP_ERROR_CHECK(ret);
+    }
+    uint8_t ver;
+    ret = nvs_get_u8(ns_h, SETTINGS_CLIENT_SETVERSION, &ver);
+    if (ret==ESP_ERR_NVS_NOT_FOUND||ver!=SETTINGS_VERSION){
+        ESP_LOGE(TAG, "settings version not found or not equal");
+        ESP_ERROR_CHECK(nvs_set_u8(ns_h, SETTINGS_CLIENT_SETVERSION, SETTINGS_VERSION));
+        memcpy(&settings, &settings_default, 8);
+        settings_store();
+    } else if (ret){
+        ESP_LOGE(TAG, "read settings version failed");
+        ESP_ERROR_CHECK(ret);
+    }
+}
+
+void settings_load(){
+    ESP_LOGI(TAG, "loading settings");
+    uint64_t tmp;
+    esp_err_t ret = nvs_get_u64(ns_h, SETTINGS_CLIENT_CONFIG, &tmp);
+    if (ret==ESP_ERR_NVS_NOT_FOUND){
+        ESP_LOGW(TAG, "settings not found");
+        memcpy(&settings, &settings_default, 8);
+    } else if (ret){
+        ESP_ERROR_CHECK(ret);
+    } else {
+        memcpy(&settings, &tmp, 8);
+    }
+}
+
+void settings_store(){
+    ESP_LOGI(TAG, "storing settings");
+    uint64_t tmp;
+    esp_err_t ret = nvs_get_u64(ns_h, SETTINGS_CLIENT_CONFIG, &tmp);
+    if (ret==ESP_ERR_NVS_NOT_FOUND){
+        ESP_LOGW(TAG, "settings not found");
+    } else if (ret){
+        ESP_ERROR_CHECK(ret);
+    } else if (!memcmp(&tmp, &settings, 8)){
+        ESP_LOGI(TAG, "no changed");
+        return;
+    }
+    memcpy(&tmp, &settings, 8);
+    ESP_ERROR_CHECK(nvs_set_u64(ns_h, SETTINGS_CLIENT_CONFIG, tmp));
+    ESP_ERROR_CHECK(nvs_commit(ns_h));
+}
+
+bool settings_field_is_bool(const struct settings_config_desc *desc){
+    assert(desc);
+    return desc->display_offset==0&&desc->display_mul==1&&desc->min_value==0&&desc->max_value==1;
+}
+
+#define __X_CASE(__index, __fieldname, __min, __max) \
+    case __index:       \
+    do {                \
+        if (is_w){     \
+            uint8_t v = *value;                 \
+            if (v<__min){                       \
+                settings.__fieldname = __min;   \
+            } else if (v>__max) {               \
+                settings.__fieldname = __max;   \
+            } else {                            \
+                settings.__fieldname = v;\
+            }           \
+        } else {        \
+            *value = settings.__fieldname;    \
+        }               \
+    } while(0);         \
+    return true
+
+bool settings_human_rw(uint8_t index, bool is_w, uint8_t *value){
+    assert(value);
+    switch (index){
+        __X_CASE(0, enable_recv_server_alarm, 0, 1);
+        __X_CASE(1, enable_recv_client_alarm, 0, 1);
+        __X_CASE(2, enable_recv_client_violance_alarm, 0, 1);
+        __X_CASE(3, server_alarm_as_violance, 0, 1);
+        __X_CASE(4, vib_normal_num, 0, 127);
+        __X_CASE(5, vib_normal_dur, 0, 127);
+        __X_CASE(6, vib_normal_itv, 0, 127);
+        __X_CASE(7, vib_normal_pwr, 1, 100);
+        __X_CASE(8, vib_violance_num, 0, 127);
+        __X_CASE(9, vib_violance_dur, 0, 127);
+        __X_CASE(10, vib_violance_itv, 0, 127);
+        __X_CASE(11, vib_violance_pwr, 1, 100);
+    default:
+        ESP_LOGE(TAG, "invalid index: %d", index);
+        return false;
+    };
+}
+#undef __X_CASE
+
+uint32_t settings_get_field_display_value(const struct settings_config_desc *desc, uint8_t value){
+    assert(desc);
+    return (value+desc->display_offset)*desc->display_mul;
+}
+
+void settings_print_field(const struct settings_config_desc *desc, uint8_t value){
+    assert(desc);
+    if (settings_field_is_bool(desc)){
+        printfln("[%s]: %s", desc->name, value?"true":"false");
+    } else {
+        printfln("[%s]: %u", desc->name, settings_get_field_display_value(desc, value));
+    }
+}
+
+uint8_t settings_displayvalue_to_rawvalue(const struct settings_config_desc *desc, uint32_t display_value){
+    assert(desc);
+    return (display_value/desc->display_mul)-desc->display_offset;
+}
+
+static void cmd_settings(uint8_t argc, const char **args){
+    if (argc==0){
+        printf("Usage:"
+            "- settings get <index> | Read settings value\r\n"
+            "- settings set <index> <value> | Write settings value\r\n"
+            "- settings list | Print all settings key\r\n"
+            "- settings save | Save settings\r\n"
+        );
+        return;
+    }
+    const char *mode = args[0];
+    if (argc==2&&!strcmp(mode, "get")){
+        const char *index_str = args[1];
+        uint32_t index;
+        if (!misc_str_to_uint(&index, index_str)||index>255){
+            println("error: index not a number");
+            return;
+        }
+        uint8_t value;
+        if (!settings_human_rw((uint8_t)index, 0, &value)){
+            println("error: invalid index");
+            return;
+        }
+        const struct settings_config_desc *desc = &settings_config_list[index];
+        settings_print_field(desc, value);
+    } else if (argc==3&&!strcmp(mode, "set")){
+        const char *index_str = args[1];
+        const char *value_str = args[2];
+        uint32_t index;
+        if (!misc_str_to_uint(&index, index_str)){
+            println("error: index not a number");
+            return;
+        }
+        if (!settings_field_is_valid(index)){
+            println("error: invalid index");
+            return;
+        }
+        const struct settings_config_desc *desc = &settings_config_list[index];
+        if (settings_field_is_bool(desc)){
+            uint8_t value;
+            if (!strcmp(value_str, "true")){
+                value = true;
+                settings_human_rw(index, true, &value);
+            } else if (!strcmp(value_str, "false")){
+                value = false;
+                settings_human_rw(index, true, &value);
+            } else {
+                println("error: value not a boolean");
+            }
+        } else {
+            uint32_t display_value;
+            if (!misc_str_to_uint(&display_value, value_str)){
+                println("error: value not a number");
+                return;
+            }
+            uint8_t raw_value = settings_displayvalue_to_rawvalue(desc, display_value);
+            settings_human_rw(index, true, &raw_value);
+        }
+    } else if (argc==1&&!strcmp(mode, "list")){
+        for (uint8_t i=0; i<SETTINGS_SET_NUM; i++){
+            const struct settings_config_desc *desc = &settings_config_list[i];
+            uint8_t value;
+            settings_human_rw(i, false, &value);
+            settings_print_field(desc, value);
+        }
+    } else if (argc==1&&!strcmp(mode, "save")){
+        settings_store();
+        println("success");
+    } else {
+        println("error: invalid arguments");
+    }   
+}
+
+void settings_addcmds(){
+    repl_addcmd("settings", "Query or edit device settings", cmd_settings);
+}
 
 #endif

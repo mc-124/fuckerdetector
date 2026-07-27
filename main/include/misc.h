@@ -19,7 +19,6 @@
 
 #define led(en) do { gpio_set_level(PIN_LED, !en); } while(0)
 
-
 void misc_gpio_init(gpio_num_t pin, gpio_mode_t mode, gpio_pull_mode_t pull, gpio_int_type_t intr);
 void misc_vbat_init();
 float misc_vbat_read();
@@ -31,3 +30,9 @@ void misc_delay_ms(uint32_t ms);
 int sec_add(int a, int b);
 int sec_sub(int a, int b);
 bool misc_str_to_int(int *out, const char *str);
+bool misc_str_to_uint(uint32_t *out, const char *str);
+
+#if CONFIG_APP_CLIENT
+void misc_vibration_init();
+void misc_vibration_set(uint8_t pwr);
+#endif

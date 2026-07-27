@@ -21,6 +21,7 @@
         - bool `Scan interval (ms)` 扫描持续时间（ms）
         - bool `Scan window (ms)` 扫描窗口（ms
         - bool `Scan response duration (ms)` 扫描响应包的持续时间（ms）
+        - bool `Settings and UI use Chinese` 把REPL中的设置和UI改成中文的
     - menu `Server` 服务端设置
         - int `I2C bus speed (KHz)` I2C 总线速度
         - string `Advertising name (length <= 16 char)` 广告包名 大小不要超过 16 字节

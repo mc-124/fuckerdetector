@@ -18,3 +18,4 @@ dependencies:
   nixy4/u8g2: '*'
   #nicolaielectronics/eeprom: '*'
   esp-idf-lib/ds3231: '*'
+  espressif/button: '*'
