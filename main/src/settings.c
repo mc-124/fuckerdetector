@@ -226,49 +226,32 @@ const static struct settings settings_default = {
 };
 static_assert(sizeof(struct settings)==8);
 
-#if CONFIG_APP_CLIENT_USE_ZH
-#define TEXT_0 "接收探测器警告"
-#define TEXT_1 "接收客户端警告"
-#define TEXT_2 "接收客户端暴力"
-#define TEXT_3 "探测器使用暴力"
-#define TEXT_4 "警告震动次数"
-#define TEXT_5 "警告震动时长"
-#define TEXT_6 "警告震动间隔"
-#define TEXT_7 "警告震动功率"
-#define TEXT_8 "暴力震动次数"
-#define TEXT_9 "暴力震动时长"
-#define TEXT_A "暴力震动间隔"
-#define TEXT_B "暴力震动功率"
-#else
-#define TEXT_0 "recv srv alarm", 
-#define TEXT_1 "recv cli alarm", 
-#define TEXT_2 "recv cli ALARM", 
-#define TEXT_3 "srv use ALARM",   
-#define TEXT_4 "alarm loop num"
-#define TEXT_5 "alarm duration"
-#define TEXT_6 "alarm interval"
-#define TEXT_7 "alarm power"
-#define TEXT_8 "ALARM loop num"
-#define TEXT_9 "ALARM duration"
-#define TEXT_A "ALARM interval"
-#define TEXT_B "ALARM power"
-#endif
+#define TEXT_0 
+#define TEXT_1 
+#define TEXT_2 
+#define TEXT_3 
+#define TEXT_4 
+#define TEXT_5 
+#define TEXT_6 
+#define TEXT_7 
+#define TEXT_8 
+#define TEXT_9 
+#define TEXT_A 
+#define TEXT_B 
 
 const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM] = {
-    {TEXT_0, 0,1,0,1},
-    {TEXT_1, 0,1,0,1},
-    {TEXT_2, 0,1,0,1},
-    {TEXT_3, 0,1,0,1},
-
-    {TEXT_4, 1,1,0,127},
-    {TEXT_5, 1,20,0,127},
-    {TEXT_6, 1,20,0,127},
-    {TEXT_7, 0,1,1,100},
-    
-    {TEXT_8, 1,1,0,127},
-    {TEXT_9, 1,20,0,127},
-    {TEXT_A, 1,20,0,127},
-    {TEXT_B, 0,1,1,100}    
+    {"Receive server alarm", "接收探测器警告", 0,1,0,1},
+    {"Receive client alarm", "接收客户端警告", 0,1,0,1},
+    {"Receive client violance alarm", "接收客户端暴力", 0,1,0,1},
+    {"Server alarm as violance alarm", "探测器使用暴力", 0,1,0,1},
+    {"Normal alarm vibration number", "警告震动次数", 1,1,0,127},
+    {"Normal alarm vibration duration (ms)", "警告震动时长", 1,20,0,127},
+    {"Normal alarm vibration interval (ms)", "警告震动间隔", 1,20,0,127},
+    {"Normal alarm vibration power", "警告震动功率", 0,1,1,100},
+    {"Violance alarm vibration number", "暴力震动次数", 1,1,0,127},
+    {"Violance alarm vibration duration (ms)", "暴力震动时长", 1,20,0,127},
+    {"Violance alarm vibration interval (ms)", "暴力震动间隔", 1,20,0,127},
+    {"Violance alarm vibration power", "暴力震动功率", 0,1,1,100}    
 };
 
 void settings_init(){

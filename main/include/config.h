@@ -30,8 +30,10 @@
 
 #ifdef CONFIG_COMPILER_OPTIMIZATION_LEVEL_DEBUG
 #   define FIRMWARE_VER_TYPE "Debug"
+#   define FIRMWARE_VER_TYPE_SHORT "D"
 #else
 #   define FIRMWARE_VER_TYPE "Release"
+#   define FIRMWARE_VER_TYPE_SHORT "R"
 #endif
 
 static_assert(

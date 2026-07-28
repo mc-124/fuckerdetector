@@ -15,6 +15,8 @@
 #define ADVTYPE_CLIENT_VIOLANCE ((uint8_t)0x81)
 #define ADVTYPE_CLIENT_RESPONSE ((uint8_t)0x82)
 
+#define ADV_IS_CLIENT(__u8Type) (__u8Type & 0x80)
+
 // encode vbat value range: [2.2, 4.75]
 
 inline uint8_t blelib_encode_vbat(float vbat) {return ((uint8_t)(((int)(vbat*100.0))-220));}

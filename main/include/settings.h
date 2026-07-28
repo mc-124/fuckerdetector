@@ -55,6 +55,7 @@ struct settings {
 
 struct settings_config_desc {
     const char *name;
+    const char *name_zh;
     int8_t display_offset;
     uint8_t display_mul;
     uint8_t min_value;

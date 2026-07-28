@@ -99,10 +99,6 @@ menu "FuckerDetector config"
             default 2000
             depends on APP_CLIENT_RX_CLIENTRESP
 
-        config APP_CLIENT_USE_ZH
-            bool "Settubgs and UI use Chinese"
-            default n
-
         config APP_CLIENT_VIBRATION_PWM_FREQ
             int "Vibration PWM freq (Hz)"
             range 0 20000
