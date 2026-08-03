@@ -39,9 +39,11 @@ static u8g2_t u8g2 = {};
 
 uint8_t ui_self_mac_address[6];
 char ui_self_mac_string[5];
-#define UI_ALARMDEV_RINGBUF_SIZE 7
-static struct ui_alarmdev ui_alarmdev_ringbuf[UI_ALARMDEV_RINGBUF_SIZE];
+#define UI_MAX_DISPLAY_DEV_NUM 7
+static struct ui_alarmdev ui_alarmdev_ringbuf[UI_MAX_DISPLAY_DEV_NUM];
 static uint8_t ui_alarmdev_ringbuf_start = 0;
+static struct ui_respdev ui_respdev_list[UI_MAX_DISPLAY_DEV_NUM];
+static uint8_t ui_respdev_list_len = 0;
 
 static const button_config_t btn_cfg = {
     .short_press_time = 10,
@@ -59,8 +61,8 @@ static button_handle_t btn_h = {0};
 
 static ui_btn_callback_t ui_btn_callbacks[4] = {0};
 
-#define ui_ringbuf_indexadd(__u8Index, __u8Add) ((__u8Index+__u8Add)%UI_ALARMDEV_RINGBUF_SIZE)
-#define ui_ringbuf_indexdec() ui_alarmdev_ringbuf_start = (ui_alarmdev_ringbuf_start==0 ? UI_ALARMDEV_RINGBUF_SIZE-1 : ui_alarmdev_ringbuf_start - 1)
+#define ui_ringbuf_indexadd(__u8Index, __u8Add) ((__u8Index+__u8Add)%UI_MAX_DISPLAY_DEV_NUM)
+#define ui_ringbuf_indexdec() ui_alarmdev_ringbuf_start = (ui_alarmdev_ringbuf_start==0 ? UI_MAX_DISPLAY_DEV_NUM-1 : ui_alarmdev_ringbuf_start - 1)
 
 static struct ui_alarmdev *ui_get_alarmdev(uint8_t index){
     uint8_t real_index = ui_ringbuf_indexadd(ui_alarmdev_ringbuf_start, index);
@@ -95,7 +97,7 @@ static void ui_alarmdev_time_to_str(const struct ui_alarmdev *in, char out[6]){
 }
 
 static void ui_alarmdev_to_line(const struct ui_alarmdev *in, char out[21]){
-    snprintf(out, 8, "[%04X] ", in->short_mac); // 0:7
+    snprintf(out, 8, "[%04hX] ", in->short_mac); // 0:7
     ui_alarmdev_time_to_str(in, out+7); // 7:12
     if (ADV_IS_CLIENT(in->alarm_type)){ // 12:21
         snprintf(out+12, 9, " %4hhddBm", in->rssi);
@@ -105,6 +107,18 @@ static void ui_alarmdev_to_line(const struct ui_alarmdev *in, char out[21]){
             rssi_chr = 15;
         }
         snprintf(out+12, 9, "%X %5.2fV", (char)rssi_chr, in->data.vbat);
+    }
+}
+
+void ui_clear_resp_list(){
+    ESP_LOGI(TAG, "clear resp list");
+    ui_respdev_list_len = 0;
+}
+
+void ui_add_resp_dev(struct ui_respdev dev){
+    ESP_LOGI(TAG, "add resp dev: [%04hX] %hhddBm", dev.short_mac, dev.rssi);
+    if (ui_respdev_list_len<=UI_MAX_DISPLAY_DEV_NUM){
+        ui_respdev_list[ui_respdev_list_len++] = dev;
     }
 }
 
@@ -153,12 +167,17 @@ static void ui_update(){
 void ui_init(){
     ESP_LOGI(TAG, "ui");
     ESP_ERROR_CHECK(u8g2_esp32_i2c_set_default_context(&ctx));
-    u8g2_Setup_ssd1306_i2c_128x64_noname_f(oled, U8G2_R0, u8x8_byte_esp32_hw_i2c, u8x8_gpio_and_delay_esp32_i2c);
+    u8g2_Setup_ssd1306_i2c_128x64_noname_f(
+        oled,
+        U8G2_R0,
+        u8x8_byte_esp32_hw_i2c,
+        u8x8_gpio_and_delay_esp32_i2c
+    );
     u8x8_SetI2CAddress(u8x8, PERI_SSD1306_ADDR<<1);
     u8g2_InitDisplay(oled);
     u8g2_SetPowerSave(u8x8, 0);
     esp_read_mac(ui_self_mac_address, ESP_MAC_BT);
-    snprintf(ui_self_mac_string, 5, "%04X", ui_get_short_mac(ui_self_mac_address));
+    snprintf(ui_self_mac_string, 5, "%04hX", ui_get_short_mac(ui_self_mac_address));
     memset(ui_alarmdev_ringbuf, 0, sizeof(ui_alarmdev_ringbuf));
 }
 
@@ -200,9 +219,9 @@ void ui_showpage_main(){
     ui_setfont(FONT_1);
     char buf[21];
     uint8_t y = 0;
-    snprintf(buf, sizeof(buf), FIRMWARE_VER_TYPE_SHORT FIRMWARE_VERSION"[%s]%4.2fV", ui_self_mac_string, misc_vbat_read());
+    snprintf(buf, sizeof(buf), "SCANNING [%s]%4.2fV", ui_self_mac_string, misc_vbat_read());
     u8g2_DrawStr(oled, 0, y, buf);
-    for (uint8_t i=0; i<UI_ALARMDEV_RINGBUF_SIZE; i++){
+    for (uint8_t i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
         const struct ui_alarmdev *this = ui_get_alarmdev(i);
         y += 8;
         if (this){
@@ -216,6 +235,11 @@ void ui_showpage_main(){
 static void ui_white_line_start(uint8_t y){
     u8g2_SetDrawColor(oled, 1);
     u8g2_DrawBox(oled, 0, y, 127, y+12);
+    u8g2_SetDrawColor(oled, 0);
+}
+static void ui_white_line_start_font1(uint8_t y){
+    u8g2_SetDrawColor(oled, 1);
+    u8g2_DrawBox(oled, 0, y, 127, y+8);
     u8g2_SetDrawColor(oled, 0);
 }
 static void ui_white_line_end(){
@@ -235,6 +259,7 @@ static void ui_white_line_end(){
 void ui_showpage_settings(uint8_t button_index){
     ESP_LOGI(TAG, "showpage: settings[%hhu]", button_index);
     ui_clear();
+    ui_setfont(FONT_0);
     uint8_t subpage_index = button_index / 4;
     uint8_t pagebtn_index = button_index % 4;
     const struct settings_config_desc *desc = NULL;
@@ -283,6 +308,7 @@ void ui_showpage_settingsunit(uint8_t button_index, uint8_t settings_index){
         return;
     }
     ui_clear();
+    ui_setfont(FONT_0);
 
     const struct settings_config_desc *desc = &settings_config_list[settings_index];
 
@@ -308,9 +334,31 @@ void ui_showpage_settingsunit(uint8_t button_index, uint8_t settings_index){
         if (button_index==0) ui_white_line_end();
         if (button_index==1) ui_white_line_start(52);
         u8g2_DrawStr(oled, ui_get_en_center_x(1), 52, "-");
-        if (button_index==2) ui_white_line_end();
+        if (button_index==1) ui_white_line_end();
     }
 
+    ui_update();
+}
+
+void ui_showpage_transmitting(){
+    ESP_LOGI(TAG, "showpage: transmitting");
+    ui_clear();
+    ui_setfont(FONT_1);
+
+    ui_white_line_start_font1(0);
+    u8g2_DrawStr(oled, ui_get_txt_center_y(15), 0, "TRANSMITTING...");
+    ui_white_line_end();
+
+    uint8_t y = 8;
+    char buf[21];
+    for (uint8_t i=0; i<ui_respdev_list_len; i++){
+        struct ui_respdev dev = ui_respdev_list[i];
+        if (dev.rssi){
+            snprintf(buf, sizeof(buf), "Found [%04hX] %4hhddBm");
+            u8g2_DrawStr(oled, 0, y, buf);
+        }
+        y += 8;
+    }
     ui_update();
 }
 

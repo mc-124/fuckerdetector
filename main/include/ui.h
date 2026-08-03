@@ -21,10 +21,18 @@ struct ui_alarmdev {
     } data;
 };
 
+struct ui_respdev {
+    uint16_t short_mac;
+    int8_t rssi;
+};
+// 这个结构体太小传递拷贝更有性价比
+
 extern uint8_t ui_self_mac_address[6];
 extern char ui_self_mac_string[5];
 
 void ui_add_alarmdev(const struct ui_alarmdev *dev);
+void ui_clear_resp_list();
+void ui_add_resp_dev(struct ui_respdev dev);
 uint16_t ui_get_short_mac(uint8_t mac[6]);
 
 void ui_init_buttons(   ui_btn_callback_t single_click,
@@ -36,5 +44,6 @@ void ui_showpage_launch();
 void ui_showpage_main();
 void ui_showpage_settings(uint8_t button_index);
 void ui_showpage_settingsunit(uint8_t button_index, uint8_t settings_index);
+void ui_showpage_transmitting();
 
 #endif // CONFIG_APP_CLIENT

@@ -68,6 +68,10 @@ void blelib_deinit();
 
 #if FIRMWARE_BLE_ADV
 
+/// @brief 等待广告完毕
+/// @return 广告是否完毕
+bool blelib_adv_wait_for_complete(uint32_t max_wait_ms);
+
 /// @brief 初始化广告
 void blelib_adv_init();
 
@@ -82,6 +86,10 @@ void blelib_adv_stop();
 #endif // FIRMWARE_BLE_ADV
 
 #if FIRMWARE_BLE_SCAN
+
+/// @brief 等待扫描完毕
+/// @return 扫描是否完毕
+bool blelib_scan_wait_for_complete(uint32_t max_wait_ms);
 
 /// @brief 设置扫描回调
 /// @param func 扫描回调函数指针

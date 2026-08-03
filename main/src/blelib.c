@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "esp_bt.h"
 #include "freertos/queue.h"
+#include "freertos/FreeRTOS.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -28,6 +29,9 @@ static uint8_t blelib_addr_val[6] = {0};
 
 static_assert(sizeof(blelib_addr_val)==6, "MAC buffer error");
 
+static TaskHandle_t blelib_notify_adv_completed = NULL;
+static TaskHandle_t blelib_notify_scan_completed = NULL;
+
 #if FIRMWARE_BLE_SCAN
 static blelib_scan_disc_callback_t scan_callback_func = NULL;
 #endif // FIRMWARE_BLE_SCAN
@@ -41,6 +45,9 @@ static int blelib_event_callback(struct ble_gap_event *event, void *arg){
 #if FIRMWARE_BLE_ADV
         case BLE_GAP_EVENT_ADV_COMPLETE: // adv
             ESP_LOGI(TAG, "adv completed. reason=%d", event->adv_complete);
+            if (blelib_notify_adv_completed){
+                xTaskNotify(blelib_notify_adv_completed, 0, eNoAction);
+            }
             break;
 #endif // FIRMWARE_BLE_ADV
 #if FIRMWARE_BLE_SCAN
@@ -50,7 +57,10 @@ static int blelib_event_callback(struct ble_gap_event *event, void *arg){
             }
             break;
         case BLE_GAP_EVENT_DISC_COMPLETE:
-            ESP_LOGI(TAG, "Scan completed. reason=%d", event->disc_complete);
+            ESP_LOGI(TAG, "scan completed. reason=%d", event->disc_complete);
+            if (blelib_notify_scan_completed){
+                xTaskNotify(blelib_notify_scan_completed, 0, eNoAction);
+            }
             break;
 #endif // FIRMWARE_BLE_SCAN
         default:
@@ -126,6 +136,19 @@ void blelib_deinit(){
 #endif // FIRMWARE_BLE_ADV || FIRMWARE_BLE_SCAN
 
 #if FIRMWARE_BLE_ADV
+
+bool blelib_adv_wait_for_complete(uint32_t max_wait_ms){
+    blelib_notify_adv_completed = xTaskGetCurrentTaskHandle();
+    ESP_LOGI(TAG, "waiting adv");
+    bool ret = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(max_wait_ms));
+    blelib_notify_adv_completed = NULL;
+    if (ret){
+        ESP_LOGI(TAG, "adv completed");
+    } else {
+        ESP_LOGW(TAG, "adv timeout");
+    }
+    return ret;
+}
 
 void blelib_adv_init(){
     esp_err_t ret = ble_hs_util_ensure_addr(0); // 使用公共地址
@@ -218,6 +241,13 @@ void blelib_adv_stop(){
 #endif // FIRMWARE_BLE_ADV
 
 #if FIRMWARE_BLE_SCAN
+
+bool blelib_scan_wait_for_complete(uint32_t max_wait_ms){
+    blelib_notify_scan_completed = xTaskGetCurrentTaskHandle();
+    bool ret = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(max_wait_ms));
+    blelib_notify_scan_completed = NULL;
+    return ret;
+}
 
 void blelib_scan_set_callback(const blelib_scan_disc_callback_t func){
     if (!func){
