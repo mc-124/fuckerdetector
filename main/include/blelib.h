@@ -15,6 +15,8 @@
 #define ADVTYPE_CLIENT_VIOLANCE ((uint8_t)0x81)
 #define ADVTYPE_CLIENT_RESPONSE ((uint8_t)0x82)
 
+#define BLELIB_ADV_FLAGS (BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP)
+
 #define ADV_IS_CLIENT(__u8Type) (__u8Type & 0x80)
 
 // encode vbat value range: [2.2, 4.75]
@@ -32,7 +34,7 @@ inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/1
 struct blelib_adv_manfacturer_data {
     uint16_t company_id;
     uint8_t type;
-    uint8_t encoded_vbat;
+    uint8_t encoded_vbat;   // client: 0
     union {
         int day_sec;        // server_only [0, 86400)
         uint32_t adv_id;    // client_only
@@ -46,16 +48,16 @@ typedef void(*blelib_scan_disc_callback_t)(struct ble_gap_ext_disc_desc*);;
 
 static_assert(
     (0
-        +(sizeof(APP_BLE_NAME)+2)               // Adv name
-        +(sizeof(struct blelib_adv_manfacturer_data)+2)  // ManfacturesData
+        +(sizeof(APP_BLE_NAME)+2)
+        +(sizeof(struct blelib_adv_manfacturer_data)+2)
     ) <= 31,
     "advertising data too big"
 );
 
-struct PayloadField {
+struct blelib_payload_field {
     uint8_t type;
     uint8_t len;
-    uint8_t *data;
+    const uint8_t *data;
 };
 
 /// @brief 初始化蓝牙控制器 BLE协议栈 GAP服务
@@ -108,6 +110,6 @@ void blelib_scan_stop();
 /// @param cur_ptr 当前指针
 /// @param result 迭代结果
 /// @return 是否成功
-bool blelib_iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result);
+bool blelib_iter_payload_fields(const uint8_t *start_ptr, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result);
 
 #endif // FIRMWARE_BLE_SCAN

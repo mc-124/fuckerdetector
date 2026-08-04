@@ -12,7 +12,7 @@
 #include "driver/ledc.h"
 #endif
 
-static const char* TAG = "Misc";
+static const char* TAG = "misc";
 
 static adc_oneshot_unit_handle_t misc_adc_h;
 static adc_cali_handle_t misc_cali_h;

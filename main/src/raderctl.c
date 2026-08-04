@@ -80,13 +80,14 @@ static void raderctl_init_rader(){
     if (raderctl_recv_bytes(resp_buf, sizeof(resp_buf))){
         if (!memcmp(resp_buf, INST_SET_MOVING_MODE, sizeof(resp_buf))){
             println("success");
-        } else {
-            printf("RECEIVED:");
-            for (uint8_t i=0; i<sizeof(resp_buf); i++){
-                printf(" %hhX", resp_buf[i]);
-            }
-            println("error: failed");
+            return;
+        } 
+
+        printf("RECEIVED:");
+        for (uint8_t i=0; i<sizeof(resp_buf); i++){
+            printf(" %hhX", resp_buf[i]);
         }
+        println("error: failed");
     } else {
         println("error: timeout");
     }
@@ -104,14 +105,13 @@ static int raderctl_query_th(){
         ){
             int th = resp_buf[4]<<16 | resp_buf[5]<<8 | resp_buf[6];
             return th;
-        } else {
-            printf("RECEIVED:");
-            for (uint8_t i=0; i<sizeof(resp_buf); i++){
-                printf(" %hhX", resp_buf[i]);
-            }
-            println("error: query failed");
-            return -1;
         }
+        printf("RECEIVED:");
+        for (uint8_t i=0; i<sizeof(resp_buf); i++){
+            printf(" %hhX", resp_buf[i]);
+        }
+        println("error: query failed");
+        return -1;
     } else {
         println("error: query timeout");
         return -1;
@@ -129,20 +129,18 @@ static void raderctl_set_th(int th){
     uart_write_bytes(UART_NUM_1, resp_buf, 3);
     uart_write_bytes(UART_NUM_1, INST_SET_TH_B, sizeof(INST_SET_TH_B));
     if (raderctl_recv_bytes(resp_buf, 7)){
-        if (!memcmp(resp_buf, RESP_SET_TH, sizeof(RESP_SET_TH))){
-            println("set success");
-        } else {
+        if (memcmp(resp_buf, RESP_SET_TH, sizeof(RESP_SET_TH))!=0){
             printf("RECEIVED:");
-            for (uint8_t i=0; i<sizeof(resp_buf); i++){
-                printf(" %hhX", resp_buf[i]);
-            }
+            for (uint8_t i=0; i<sizeof(resp_buf); i++){printf(" %hhX", resp_buf[i]);}
             println("error: set failed");
             return;
         }
+        println("set success");
     } else {
         println("error: set timeout");
         return;
     }
+
     misc_delay_ms(50);
     println("verify config");
     // 验证值
@@ -177,9 +175,7 @@ static void cmd_raderctl(uint8_t argc, const char **args){
             raderctl_init_rader();
         } else if (!strcmp(args[0], "query-th")){
             int th = raderctl_query_th();
-            if (th!=-1){
-                printfln("threshold: %d", th);
-            }
+            if (th!=-1) printfln("threshold: %d", th);
         } else {
             println("error: invalid arguments");
             return;

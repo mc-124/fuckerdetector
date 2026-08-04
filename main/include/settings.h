@@ -66,8 +66,11 @@ struct settings_config_desc {
 extern struct settings settings;
 extern const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM];
 
-// IDE 补全不注意会变成 settings_field_is_bool，写成宏更容易发现问题
-#define settings_field_is_valid(__Index) (0<=__Index&&__Index<SETTINGS_SET_NUM)
+DISABLE_TYPELIMIT_START
+inline bool settings_field_is_valid(uint8_t index){
+    return (0<=index&&index<SETTINGS_SET_NUM);
+}
+DISABLE_TYPELIMIT_END
 
 bool settings_field_is_bool(const struct settings_config_desc *desc);
 uint32_t settings_get_field_display_value(const struct settings_config_desc *desc, uint8_t value);

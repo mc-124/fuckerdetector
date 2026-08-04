@@ -1,3 +1,6 @@
+// 这个文件里可能会有隐藏 BUG，因为它们有较多都是我在深夜里神志不清时写的
+// 力竭了，懒得修
+
 #include "settings.h"
 
 #include "misc.h"
@@ -332,7 +335,8 @@ bool settings_field_is_bool(const struct settings_config_desc *desc){
 bool settings_human_rw(uint8_t index, bool is_w, uint8_t *value){
     assert(value);
     switch (index){
-        __X_CASE(0, enable_recv_server_alarm, 0, 1);
+DISABLE_TYPELIMIT_START
+        __X_CASE(0, enable_recv_server_alarm, 0, 1); 
         __X_CASE(1, enable_recv_client_alarm, 0, 1);
         __X_CASE(2, enable_recv_client_violance_alarm, 0, 1);
         __X_CASE(3, server_alarm_as_violance, 0, 1);
@@ -348,6 +352,7 @@ bool settings_human_rw(uint8_t index, bool is_w, uint8_t *value){
         ESP_LOGE(TAG, "invalid index: %d", index);
         return false;
     };
+DISABLE_TYPELIMIT_END
 }
 #undef __X_CASE
 
@@ -361,7 +366,7 @@ void settings_print_field(const struct settings_config_desc *desc, uint8_t value
     if (settings_field_is_bool(desc)){
         printfln("[%s]: %s", desc->name, value?"true":"false");
     } else {
-        printfln("[%s]: %u", desc->name, settings_get_field_display_value(desc, value));
+        printfln("[%s]: %u", desc->name, U32 settings_get_field_display_value(desc, value));
     }
 }
 

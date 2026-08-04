@@ -43,28 +43,28 @@ static blelib_scan_disc_callback_t scan_callback_func = NULL;
 static int blelib_event_callback(struct ble_gap_event *event, void *arg){
     switch (event->type){
 #if FIRMWARE_BLE_ADV
-        case BLE_GAP_EVENT_ADV_COMPLETE: // adv
-            ESP_LOGI(TAG, "adv completed. reason=%d", event->adv_complete);
-            if (blelib_notify_adv_completed){
-                xTaskNotify(blelib_notify_adv_completed, 0, eNoAction);
-            }
-            break;
+    case BLE_GAP_EVENT_ADV_COMPLETE: // adv
+        ESP_LOGI(TAG, "adv completed. reason=%d", event->adv_complete);
+        if (blelib_notify_adv_completed){
+            xTaskNotify(blelib_notify_adv_completed, 0, eNoAction);
+        }
+        break;
 #endif // FIRMWARE_BLE_ADV
 #if FIRMWARE_BLE_SCAN
-        case BLE_GAP_EVENT_EXT_DISC: // scan
-            if (scan_callback_func){
-                scan_callback_func(&event->ext_disc);
-            }
-            break;
-        case BLE_GAP_EVENT_DISC_COMPLETE:
-            ESP_LOGI(TAG, "scan completed. reason=%d", event->disc_complete);
-            if (blelib_notify_scan_completed){
-                xTaskNotify(blelib_notify_scan_completed, 0, eNoAction);
-            }
-            break;
+    case BLE_GAP_EVENT_EXT_DISC: // scan
+        if (scan_callback_func){
+            scan_callback_func(&event->ext_disc);
+        }
+        break;
+    case BLE_GAP_EVENT_DISC_COMPLETE:
+        ESP_LOGI(TAG, "scan completed. reason=%d", event->disc_complete);
+        if (blelib_notify_scan_completed){
+            xTaskNotify(blelib_notify_scan_completed, 0, eNoAction);
+        }
+        break;
 #endif // FIRMWARE_BLE_SCAN
-        default:
-            break;
+    default:
+        break;
     }
     return 0;
 }
@@ -199,11 +199,29 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
 
     uint8_t payload[31] = {0};
     uint8_t payload_len = 0;
-    uint8_t flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
+    uint8_t flags = BLELIB_ADV_FLAGS;
 
-    blelib_add_data_to_payload(payload, &payload_len, BLE_HS_ADV_TYPE_FLAGS, 1, &flags); // Flags
-    blelib_add_data_to_payload(payload, &payload_len, BLE_HS_ADV_TYPE_COMP_NAME, sizeof(APP_BLE_NAME)-1, (void*)APP_BLE_NAME); // Name
-    blelib_add_data_to_payload(payload, &payload_len, BLE_HS_ADV_TYPE_MFG_DATA, sizeof(struct blelib_adv_manfacturer_data), data); // ManfacturerData
+    blelib_add_data_to_payload(
+        payload, 
+        &payload_len, 
+        BLE_HS_ADV_TYPE_FLAGS, 
+        1, 
+        &flags
+    );
+    blelib_add_data_to_payload(
+        payload, 
+        &payload_len, 
+        BLE_HS_ADV_TYPE_COMP_NAME, 
+        sizeof(APP_BLE_NAME)-1, 
+        (void*)APP_BLE_NAME
+    );
+    blelib_add_data_to_payload(
+        payload, 
+        &payload_len, 
+        BLE_HS_ADV_TYPE_MFG_DATA, 
+        sizeof(struct blelib_adv_manfacturer_data), 
+        data
+    );
 
     //printfln("payload_len = %d", payload_len);
 
@@ -292,8 +310,8 @@ void blelib_scan_stop(){
     ESP_LOGI(TAG, "scan stopped");
 }
 
-bool blelib_iter_payload_fields(uint8_t *start_ptr, uint16_t size, uint8_t **cur_ptr, struct PayloadField *result){
-    uint8_t *end_ptr = start_ptr + size;
+bool blelib_iter_payload_fields(const uint8_t *start_ptr, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result){
+    const uint8_t *end_ptr = start_ptr + size;
     if (*cur_ptr<start_ptr||*cur_ptr>=end_ptr){
         return false;
     }

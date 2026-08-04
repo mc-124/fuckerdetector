@@ -16,10 +16,6 @@
 #   error invalid firmware type
 #endif
 
-#ifndef CONFIG_APP_CLIENT_RESPONSE_ENABLED
-#define CONFIG_APP_CLIENT_RESPONSE_ENABLED 0
-#endif /* CONFIG_APP_CLIENT_RESPONSE_ENABLED */
-
 #if CONFIG_APP_SERVER
 #   define FIRMWARE_TYPE_STRING "Server"
 #elif CONFIG_APP_CLIENT
@@ -42,6 +38,13 @@ static_assert(
     &&10<=CONFIG_APP_CLIENT_I2C_SPEED&&CONFIG_APP_CLIENT_I2C_SPEED<=400,
     "config out of range"
 );
+
+#define U32 (unsigned int)
+#define DISABLE_TYPELIMIT_START \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wtype-limits\"")
+#define DISABLE_TYPELIMIT_END \
+    _Pragma("GCC diagnostic pop")
 
 #if CONFIG_APP_SERVER
 #   define CONFIG_APP_I2C_SPEED CONFIG_APP_SERVER_I2C_SPEED
@@ -131,6 +134,8 @@ static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MA
 // 外设 UART1
 #define PERI_UART_BAUD 9600
 #define PERI_UART_BUFSIZE 256
+
+// 8bit 地址
 #define PERI_SSD1306_ADDR 0x3C
 //#define PERI_AT24C32_ADDR 0b1010111
 //#define PERI_IIC_FREQ 1000000

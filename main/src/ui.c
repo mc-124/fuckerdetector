@@ -5,7 +5,6 @@
 #include "misc.h"
 #include "settings.h"
 
-#include "driver/i2c.h"
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
 #include "esp_crc.h"
@@ -30,7 +29,10 @@ static u8g2_esp32_i2c_ctx_t ctx = {
         .scl_pin = PIN_IIC_SCL,
         .clk_hz = 400000,
         .dev_addr_7bit = PERI_SSD1306_ADDR,
-    }
+        .reset_pin = -1,
+        .timeout_ms = 200
+    },
+    .current_addr_7bit = PERI_SSD1306_ADDR,
 };
 
 static u8g2_t u8g2 = {};
@@ -49,6 +51,7 @@ static const button_config_t btn_cfg = {
     .short_press_time = 10,
     .long_press_time = 640,
 };
+
 
 static const button_gpio_config_t btn_gpio_cfg = {
     .gpio_num = PIN_FUNCT,
@@ -77,22 +80,23 @@ void ui_add_alarmdev(const struct ui_alarmdev *dev){
 }
 
 static void ui_alarmdev_time_to_str(const struct ui_alarmdev *in, char out[6]){
-    if (ADV_IS_CLIENT(in->alarm_type)){
-        uint32_t diff = ((uint32_t)get_seconds()) - in->time.recv_time_s;
-        uint8_t h = diff / 3600;
-        if (h==0){
-            uint8_t m = diff % 3600 / 60;
-            if (m==0){
-                snprintf(out, 6, "  >1m");
-            } else {
-                snprintf(out, 6, " %3hhum", m);
-            }
-        } else if (h<100){
-            uint8_t m2 = (diff % 3600 / 60)/6;
-            snprintf(out, 6, "%2hhu.%hhuh", h, m2);
+    if (!ADV_IS_CLIENT(in->alarm_type)){
+        return;
+    }
+    uint32_t diff = ((uint32_t)get_seconds()) - in->time.recv_time_s;
+    uint8_t h = diff / 3600;
+    if (h==0){
+        uint8_t m = diff % 3600 / 60;
+        if (m==0){
+            snprintf(out, 6, "  >1m");
         } else {
-            snprintf(out, 6, " 99h+");
+            snprintf(out, 6, " %3hhum", m);
         }
+    } else if (h<100){
+        uint8_t m2 = (diff % 3600 / 60)/6;
+        snprintf(out, 6, "%2hhu.%hhuh", h, m2);
+    } else {
+        snprintf(out, 6, " 99h+");
     }
 }
 
@@ -143,7 +147,7 @@ void ui_init_buttons(
     ui_btn_callbacks[1] = double_click;
     ui_btn_callbacks[2] = lpress_start;
     ui_btn_callbacks[3] = lpress_stop;
-    ESP_ERROR_CHECK(iot_button_new_gpio_device(&btn_cfg, NULL, &btn_h));
+    ESP_ERROR_CHECK(iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn_h));
     ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_SINGLE_CLICK, NULL, ui_btn_callback, (void*)0));
     ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_DOUBLE_CLICK, NULL, ui_btn_callback, (void*)1));
     ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_LONG_PRESS_START, NULL, ui_btn_callback, (void*)2));
@@ -165,7 +169,7 @@ static void ui_update(){
 }
 
 void ui_init(){
-    ESP_LOGI(TAG, "ui");
+    ESP_LOGI(TAG, "init ui");
     ESP_ERROR_CHECK(u8g2_esp32_i2c_set_default_context(&ctx));
     u8g2_Setup_ssd1306_i2c_128x64_noname_f(
         oled,
@@ -173,7 +177,7 @@ void ui_init(){
         u8x8_byte_esp32_hw_i2c,
         u8x8_gpio_and_delay_esp32_i2c
     );
-    u8x8_SetI2CAddress(u8x8, PERI_SSD1306_ADDR<<1);
+    u8x8_SetI2CAddress(u8x8, PERI_SSD1306_ADDR<<1); // 8bit
     u8g2_InitDisplay(oled);
     u8g2_SetPowerSave(u8x8, 0);
     esp_read_mac(ui_self_mac_address, ESP_MAC_BT);
@@ -207,7 +211,7 @@ void ui_showpage_launch(){
     u8g2_DrawStr(oled, ui_get_en_center_x(14)+8, y, buf);
 
     ui_update();
-    misc_vibration_set(50);
+    misc_vibration_set(10);
     misc_delay_ms(1000);
     misc_vibration_set(0);
     ui_oled_invert(false);
@@ -327,7 +331,7 @@ void ui_showpage_settingsunit(uint8_t button_index, uint8_t settings_index){
         uint32_t ds_val = settings_get_field_display_value(desc, cur_val);
         u8g2_DrawStr(oled, 0, 28, ">");
         char buf[9];
-        snprintf(buf, sizeof(buf), "%8u", ds_val);
+        snprintf(buf, sizeof(buf), "%8u", U32 ds_val);
         u8g2_DrawStr(oled, 127-(8*6), 28, buf);
         if (button_index==0) ui_white_line_start(40);
         u8g2_DrawStr(oled, ui_get_en_center_x(1), 40, "+");
@@ -354,7 +358,7 @@ void ui_showpage_transmitting(){
     for (uint8_t i=0; i<ui_respdev_list_len; i++){
         struct ui_respdev dev = ui_respdev_list[i];
         if (dev.rssi){
-            snprintf(buf, sizeof(buf), "Found [%04hX] %4hhddBm");
+            snprintf(buf, sizeof(buf), "Found [%04hX] %4hhddBm", dev.short_mac, dev.rssi);
             u8g2_DrawStr(oled, 0, y, buf);
         }
         y += 8;

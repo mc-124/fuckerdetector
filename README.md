@@ -3,7 +3,9 @@
 # fuckerdetector
 一个基于ESP32C3的简易行人探测器，我将会把它放在我学校的班门口，防止领导巡堂打扰我的睡眠
 
-本项目使用ESP-IDF v6.0.2，依赖项请看`idf_component.yml`
+本项目使用ESP-IDF v6.0.2，依赖项请看 `main/idf_component.yml`
+
+这个项目没有编码规范，主要是不能有箭头代码和巨长的一行
 
 ## 引脚
 |Pin    |Mode           |Type       |Desc                   |

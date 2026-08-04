@@ -79,9 +79,8 @@ static void cmd_help(uint8_t argc, const char **args){
         println("-------- HELP --------");
         for (uint8_t i=0; i<REPL_MAX_CMDS; i++){
             const struct repl_command *cmd = &ctx->cmds[i];
-            if (cmd->func){
-                printfln("- (%s): %s", cmd->name, cmd->prompt);
-            }
+            if (!cmd->func) return;
+            printfln("- (%s): %s", cmd->name, cmd->prompt);
         }
     } else {
         println("error: invalid arguments");

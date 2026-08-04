@@ -35,10 +35,12 @@ void ui_clear_resp_list();
 void ui_add_resp_dev(struct ui_respdev dev);
 uint16_t ui_get_short_mac(uint8_t mac[6]);
 
-void ui_init_buttons(   ui_btn_callback_t single_click,
-                        ui_btn_callback_t double_click,
-                        ui_btn_callback_t lpress_start,
-                        ui_btn_callback_t lpress_stop   );
+void ui_init_buttons(
+    ui_btn_callback_t single_click,
+    ui_btn_callback_t double_click,
+    ui_btn_callback_t lpress_start,
+    ui_btn_callback_t lpress_stop
+);
 void ui_init();
 void ui_showpage_launch();
 void ui_showpage_main();
