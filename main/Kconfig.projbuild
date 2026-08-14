@@ -1,80 +1,80 @@
 menu "FuckerDetector config"
 
     choice APP_FIRMWARE_TYPE
-        prompt "Firmware type"
+        prompt "编译固件类型"
         default APP_SERVER
             
         config APP_SERVER
-            bool "Server"
+            bool "Server - 服务端（探测器）"
                 
         config APP_CLIENT
-            bool "Client"
+            bool "Client - 客户端（接收器）"
     
     endchoice
 
-    menu "Misc"
+    menu "杂项"
 
         config APP_BLE_COMPANY_ID
-            hex "Advertising company_id field value"
+            hex "广告的 ManfacturerData 中 CompanyID 字段的值"
             range 0x0000 0xffff
             default 0xff64
 
         config APP_BLE_PROTOCOL_VER
-            hex "Protocol version"
+            hex "广告中数据包的协议版本号（仅用于避免冲突）"
             range 0x0000 0xffff
             default 0xCC55
     
     endmenu
 
-    menu "Client"
-
-        config APP_CLIENT_I2C_SPEED
-            int "I2C bus speed (KHz)"
-            range 10 400
-            default 100
+    menu "Client - 客户端（接收器）配置 "
 
         config APP_CLIENT_BLE_NAME
-            string "Advertising name (length <= 16 char)"
+            string "广告包设备名称（长度小于 16 字节）"
             default "cliV2"
 
         config APP_CLIENT_RX_SERVERALARM
-            bool "Enable receive server alarm"
+            bool "允许接收服务端警报"
             default y
 
         config APP_CLIENT_TX_CLIENTALARM
-            bool "Enable transmit client alarm"
+            bool "允许发送客户端警报"
             default y
         
         config APP_CLIENT_RX_CLIENTALARM
-            bool "Enable receive client alarm"
+            bool "允许接收客户端警报"
             default y 
 
         config APP_CLIENT_TX_CLIENTRESP
-            bool "Enable transmit client response"
+            bool "允许发送客户端响应包"
             default y
             depends on APP_CLIENT_RX_CLIENTALARM
 
         config APP_CLIENT_RX_CLIENTRESP
-            bool "Enable receive client response"
+            bool "允许接收客户端响应包"
             default y 
             depends on APP_CLIENT_TX_CLIENTALARM
+
+        config APP_CLIENT_MAINLOOP_TPS
+            int "主循环 TPS （设置 0 则无等待）"
+            default 20
+            range 1 1000
 
         # ble advertising
 
         config APP_CLIENT_ADV_DURATION
-            int "Advertising duration (ms)"
+            int "广告持续时间 (ms)"
             range 500 60000
             default 3000
             depends on APP_CLIENT_TX_CLIENTALARM
 
         config APP_CLIENT_ADV_ITVL_MAX
-            int "Max advertising interval (ms)"
+            int "最大广告间隔 (ms)"
             range 20 10240
             default 128
             depends on APP_CLIENT_TX_CLIENTALARM
         
         config APP_CLIENT_ADV_ITVL_MIN
-            int "Min advertising interval (ms)"
+            int "最小广告间隔 (ms)"
             range 20 10240
             default 32
             depends on APP_CLIENT_TX_CLIENTALARM
@@ -82,73 +82,73 @@ menu "FuckerDetector config"
         # ble scanning
 
         config APP_CLIENT_SCAN_ITVL
-            int "Scan interval (ms)"
+            int "扫描间隔 (ms)"
             range 20 10240
             default 96
             depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
 
         config APP_CLIENT_SCAN_WINDOW
-            int "Scan window (ms)"
+            int "扫描窗口 (ms)"
             range 20 10240
             default 48
             depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
 
         config APP_CLIENT_RESP_SCAN_DURATION
-            int "Scan response duration (ms)"
+            int "扫描响应包持续时间 (ms)"
             range 500 60000
             default 2000
             depends on APP_CLIENT_RX_CLIENTRESP
 
         config APP_CLIENT_VIBRATION_PWM_FREQ
-            int "Vibration PWM freq (Hz)"
-            range 0 20000
-            default 1000
+            int "震动频率 (Hz)"
+            range 0 16383
+            default 200
 
     endmenu
 
-    menu "Server"
+    menu "Server - 服务端（探测器）配置"
 
         config APP_SERVER_BLE_NAME
-            string "Advertising name (length <= 16 char)"
+            string "广告包名称（长度小于 16 字节）"
             default "srvV2"
 
         choice APP_SERVER_RTC_TYPE
-            prompt "RTC type"
+            prompt "RTC 模块类型"
             default APP_SERVER_RTC_DS3231
 
             config APP_SERVER_RTC_DISABLED
-                bool "Disabled"
+                bool "禁用（不稳定）"
 
             config APP_SERVER_RTC_DS3231
                 bool "DS3231"
         endchoice
 
         config APP_SERVER_ADV_DURATION
-            int "Advertising duration (ms)"
+            int "广告持续时间 (ms)"
             range 500 60000
             default 5000
 
         config APP_SERVER_ADV_ITVL_MAX
-            int "Max advertising interval (ms)"
+            int "最大广告间隔 (ms)"
             range 20 10240
             default 128
 
         config APP_SERVER_ADV_ITVL_MIN
-            int "Min advertising interval (ms)"
+            int "最小广告间隔 (ms)"
             range 20 10240
             default 32
 
         config APP_SERVER_SLPITVL_MAX_NUM
-            int "Max sleep intervals number"
+            int "最大睡眠间隔数量"
             range 2 255
             default 16
 
         choice APP_SERVER_RADER_TYPE
-            prompt "Rader type"
+            prompt "雷达类型"
             default APP_SERVER_RADER_HLKLD1040
 
             config APP_SERVER_RADER_UNKNOWN
-                bool "Unknown"
+                bool "未知（不稳定）"
 
             config APP_SERVER_RADER_HLKLD1040
                 bool "HLK-LD1040 / HLK-LD1040C"
@@ -156,29 +156,29 @@ menu "FuckerDetector config"
         endchoice
 
         choice APP_SERVER_RADER_TRIG_TYPE
-            prompt "Rader trigger level"
+            prompt "雷达触发电平"
             default APP_SERVER_RADER_TRIG_HIGH
             depends on APP_SERVER_RADER_UNKNOWN
 
             config APP_SERVER_RADER_TRIG_HIGH
-                bool "High-level trigger"
+                bool "高电平触发"
 
             config APP_SERVER_RADER_TRIG_LOW
-                bool "Low-level trigger"
+                bool "低电平触发"
         endchoice
 
         config APP_SERVER_RADER_PWRON_DURATION
-            int "Rader power on wait duration (ms)"
+            int "雷达上电初始化持续时间 (ms)"
             range 0 60000
             default 7000
             depends on APP_SERVER_RADER_UNKNOWN
 
         config APP_SERVER_AUTOPWOFF_ENABLED
-            bool "Enable low battery voltaget poweroff"
+            bool "启用低电压自动关机"
             default y
         
         config APP_SERVER_AUTOPWOFF_LIMIT
-            int "Poweroff voltage (mV)"
+            int "关机电压 (mV)"
             range 2000 4000
             default 2700
             depends on APP_SERVER_AUTOPWOFF_ENABLED

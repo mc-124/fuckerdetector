@@ -45,12 +45,12 @@ struct settings {
     uint8_t vib_normal_itv; // 普通震动 震动间隔（20ms）(0-255)+1 10ms-5120ms
     uint8_t enable_recv_client_alarm:1; // 启用接收客户端警告
     uint8_t vib_normal_pwr:7; // 普通震动 震动功率 1-100
-    uint8_t enable_recv_client_violance_alarm:1; // 启用接收客来自户端的暴力型警告
-    uint8_t vib_violance_num:7; // 暴力震动 震动次数 (0-127)+1
-    uint8_t vib_violance_dur; // 暴力震动 震动时间（20ms）(0-255)+1 10ms-5120ms 
-    uint8_t vib_violance_itv; // 暴力震动 震动间隔（20ms）(0-255)+1 10ms-5120ms
-    uint8_t server_alarm_as_violance:1; // 把探测端警告视为暴力型警告
-    uint8_t vib_violance_pwr:7; // 暴力震动 震动功率 1-100
+    uint8_t enable_recv_client_loud_alarm:1; // 启用接收客来自户端的强力警告
+    uint8_t vib_loud_num:7; // 强力震动 震动次数 (0-127)+1
+    uint8_t vib_loud_dur; // 强力震动 震动时间（20ms）(0-255)+1 10ms-5120ms 
+    uint8_t vib_loud_itv; // 强力震动 震动间隔（20ms）(0-255)+1 10ms-5120ms
+    uint8_t server_alarm_as_power:1; // 把探测端警告视为强力警告
+    uint8_t vib_loud_pwr:7; // 强力震动 震动功率 1-100
 };
 
 struct settings_config_desc {

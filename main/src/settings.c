@@ -220,12 +220,12 @@ const static struct settings settings_default = {
     .vib_normal_itv = MS_TO_VIB(500),
     .enable_recv_client_alarm = true,
     .vib_normal_pwr = 20-1,
-    .enable_recv_client_violance_alarm = true,
-    .vib_violance_num = 2,
-    .vib_violance_dur = MS_TO_VIB(1500),
-    .vib_violance_itv = MS_TO_VIB(800),
-    .server_alarm_as_violance = true,
-    .vib_violance_pwr = 70-1,
+    .enable_recv_client_loud_alarm = true,
+    .vib_loud_num = 2,
+    .vib_loud_dur = MS_TO_VIB(1500),
+    .vib_loud_itv = MS_TO_VIB(800),
+    .server_alarm_as_power = true,
+    .vib_loud_pwr = 70-1,
 };
 static_assert(sizeof(struct settings)==8);
 
@@ -245,16 +245,16 @@ static_assert(sizeof(struct settings)==8);
 const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM] = {
     {"Receive server alarm", "接收探测器警告", 0,1,0,1},
     {"Receive client alarm", "接收客户端警告", 0,1,0,1},
-    {"Receive client violance alarm", "接收客户端暴力", 0,1,0,1},
-    {"Server alarm as violance alarm", "探测器使用暴力", 0,1,0,1},
+    {"Receive client loud alarm", "接收客户端强力", 0,1,0,1},
+    {"Server alarm as loud alarm", "探测器使用强力", 0,1,0,1},
     {"Normal alarm vibration number", "警告震动次数", 1,1,0,127},
     {"Normal alarm vibration duration (ms)", "警告震动时长", 1,20,0,127},
     {"Normal alarm vibration interval (ms)", "警告震动间隔", 1,20,0,127},
     {"Normal alarm vibration power", "警告震动功率", 0,1,1,100},
-    {"Violance alarm vibration number", "暴力震动次数", 1,1,0,127},
-    {"Violance alarm vibration duration (ms)", "暴力震动时长", 1,20,0,127},
-    {"Violance alarm vibration interval (ms)", "暴力震动间隔", 1,20,0,127},
-    {"Violance alarm vibration power", "暴力震动功率", 0,1,1,100}    
+    {"Violance alarm vibration number", "强力震动次数", 1,1,0,127},
+    {"Violance alarm vibration duration (ms)", "强力震动时长", 1,20,0,127},
+    {"Violance alarm vibration interval (ms)", "强力震动间隔", 1,20,0,127},
+    {"Violance alarm vibration power", "强力震动功率", 0,1,1,100}    
 };
 
 void settings_init(){
@@ -338,16 +338,16 @@ bool settings_human_rw(uint8_t index, bool is_w, uint8_t *value){
 DISABLE_TYPELIMIT_START
         __X_CASE(0, enable_recv_server_alarm, 0, 1); 
         __X_CASE(1, enable_recv_client_alarm, 0, 1);
-        __X_CASE(2, enable_recv_client_violance_alarm, 0, 1);
-        __X_CASE(3, server_alarm_as_violance, 0, 1);
+        __X_CASE(2, enable_recv_client_loud_alarm, 0, 1);
+        __X_CASE(3, server_alarm_as_power, 0, 1);
         __X_CASE(4, vib_normal_num, 0, 127);
         __X_CASE(5, vib_normal_dur, 0, 127);
         __X_CASE(6, vib_normal_itv, 0, 127);
         __X_CASE(7, vib_normal_pwr, 1, 100);
-        __X_CASE(8, vib_violance_num, 0, 127);
-        __X_CASE(9, vib_violance_dur, 0, 127);
-        __X_CASE(10, vib_violance_itv, 0, 127);
-        __X_CASE(11, vib_violance_pwr, 1, 100);
+        __X_CASE(8, vib_loud_num, 0, 127);
+        __X_CASE(9, vib_loud_dur, 0, 127);
+        __X_CASE(10, vib_loud_itv, 0, 127);
+        __X_CASE(11, vib_loud_pwr, 1, 100);
     default:
         ESP_LOGE(TAG, "invalid index: %d", index);
         return false;

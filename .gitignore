@@ -7,3 +7,4 @@ managed_components/
 *.lock
 .codeignore
 *.pdf
+menuconfig.zh.md

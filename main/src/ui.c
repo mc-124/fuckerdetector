@@ -130,28 +130,41 @@ uint16_t ui_get_short_mac(uint8_t mac[6]){
     return esp_crc32_le(0xCC114514, mac, 6) % 0xffff;
 }
 
-static void ui_btn_callback(void *a, void *usr_data){
-    uint32_t i = (uint32_t)usr_data;
-    ui_btn_callback_t cb = ui_btn_callbacks[i];
-    if (cb) cb();
-}
-
-void ui_init_buttons(
-    ui_btn_callback_t single_click,
-    ui_btn_callback_t double_click,
-    ui_btn_callback_t lpress_start,
-    ui_btn_callback_t lpress_stop
-){
+void ui_init_buttons(ui_btn_callback_t callback){
     ESP_LOGI(TAG, "init buttons");
-    ui_btn_callbacks[0] = single_click;
-    ui_btn_callbacks[1] = double_click;
-    ui_btn_callbacks[2] = lpress_start;
-    ui_btn_callbacks[3] = lpress_stop;
-    ESP_ERROR_CHECK(iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn_h));
-    ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_SINGLE_CLICK, NULL, ui_btn_callback, (void*)0));
-    ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_DOUBLE_CLICK, NULL, ui_btn_callback, (void*)1));
-    ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_LONG_PRESS_START, NULL, ui_btn_callback, (void*)2));
-    ESP_ERROR_CHECK(iot_button_register_cb(btn_h, BUTTON_LONG_PRESS_UP, NULL, ui_btn_callback, (void*)3));
+    ESP_ERROR_CHECK(iot_button_new_gpio_device(
+        &btn_cfg, 
+        &btn_gpio_cfg, 
+        &btn_h
+    ));
+    ESP_ERROR_CHECK(iot_button_register_cb(
+        btn_h, 
+        BUTTON_SINGLE_CLICK, 
+        NULL, 
+        callback,
+        (void*)UI_BTN_SINGLE_CLICK
+    ));
+    ESP_ERROR_CHECK(iot_button_register_cb(
+        btn_h, 
+        BUTTON_DOUBLE_CLICK, 
+        NULL, 
+        callback, 
+        (void*)UI_BTN_DOUBLE_CLICK
+    ));
+    ESP_ERROR_CHECK(iot_button_register_cb(
+        btn_h, 
+        BUTTON_LONG_PRESS_START, 
+        NULL, 
+        callback, 
+        (void*)UI_BTN_LONGPRESS_START
+    ));
+    ESP_ERROR_CHECK(iot_button_register_cb(
+        btn_h, 
+        BUTTON_LONG_PRESS_UP, 
+        NULL, 
+        callback, 
+        (void*)UI_BTN_LONGPRESS_END
+    ));
 }
 
 static void ui_oled_invert(bool en){

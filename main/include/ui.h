@@ -5,7 +5,19 @@
 
 #if CONFIG_APP_CLIENT
 
-typedef void(*ui_btn_callback_t)(void);
+enum ui_btn_event {
+    UI_BTN_NOEVENT,
+    UI_BTN_SINGLE_CLICK,
+    UI_BTN_DOUBLE_CLICK,
+    UI_BTN_LONGPRESS_START,
+    UI_BTN_LONGPRESS_END
+};
+
+/// @brief 按钮回调函数指针类型
+/// ### 参数
+/// 1. `phbutton` 输入指针，实际类型为 `button_handle_t`
+/// 2. `u32event` 整数，实际类型为 `enum ui_btn_event`
+typedef void(*ui_btn_callback_t)(void *phbutton, void *u32event);
 
 struct ui_alarmdev {
     uint16_t short_mac;
@@ -25,7 +37,6 @@ struct ui_respdev {
     uint16_t short_mac;
     int8_t rssi;
 };
-// 这个结构体太小传递拷贝更有性价比
 
 extern uint8_t ui_self_mac_address[6];
 extern char ui_self_mac_string[5];
@@ -35,12 +46,7 @@ void ui_clear_resp_list();
 void ui_add_resp_dev(struct ui_respdev dev);
 uint16_t ui_get_short_mac(uint8_t mac[6]);
 
-void ui_init_buttons(
-    ui_btn_callback_t single_click,
-    ui_btn_callback_t double_click,
-    ui_btn_callback_t lpress_start,
-    ui_btn_callback_t lpress_stop
-);
+void ui_init_buttons(ui_btn_callback_t callback);
 void ui_init();
 void ui_showpage_launch();
 void ui_showpage_main();

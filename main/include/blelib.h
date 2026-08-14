@@ -12,7 +12,7 @@
 #define ADVTYPE_SERVER_ALARM    ((uint8_t)0x00)
 
 #define ADVTYPE_CLIENT_ALARM    ((uint8_t)0x80)
-#define ADVTYPE_CLIENT_VIOLANCE ((uint8_t)0x81)
+#define ADVTYPE_CLIENT_LOUD ((uint8_t)0x81)
 #define ADVTYPE_CLIENT_RESPONSE ((uint8_t)0x82)
 
 #define BLELIB_ADV_FLAGS (BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP)
@@ -44,7 +44,7 @@ struct blelib_adv_manfacturer_data {
 #pragma pack()
 
 /// @brief 扫描回调函数指针
-typedef void(*blelib_scan_disc_callback_t)(struct ble_gap_ext_disc_desc*);;
+typedef void(*blelib_scan_disc_callback_t)(const struct ble_gap_ext_disc_desc*);;
 
 static_assert(
     (0

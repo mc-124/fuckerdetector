@@ -826,19 +826,17 @@ CONFIG_PARTITION_TABLE_MD5=y
 CONFIG_APP_CLIENT=y
 
 #
-# Misc
+# 杂项
 #
 # default:
 CONFIG_APP_BLE_COMPANY_ID=0xff64
 # default:
 CONFIG_APP_BLE_PROTOCOL_VER=0xCC55
-# end of Misc
+# end of 杂项
 
 #
-# Client
+# Client - 客户端（接收器）配置 
 #
-# default:
-CONFIG_APP_CLIENT_I2C_SPEED=100
 # default:
 CONFIG_APP_CLIENT_BLE_NAME="cliV2"
 # default:
@@ -852,6 +850,8 @@ CONFIG_APP_CLIENT_TX_CLIENTRESP=y
 # default:
 CONFIG_APP_CLIENT_RX_CLIENTRESP=y
 # default:
+CONFIG_APP_CLIENT_MAINLOOP_TPS=20
+# default:
 CONFIG_APP_CLIENT_ADV_DURATION=3000
 # default:
 CONFIG_APP_CLIENT_ADV_ITVL_MAX=128
@@ -864,10 +864,10 @@ CONFIG_APP_CLIENT_SCAN_WINDOW=48
 # default:
 CONFIG_APP_CLIENT_RESP_SCAN_DURATION=2000
 CONFIG_APP_CLIENT_VIBRATION_PWM_FREQ=200
-# end of Client
+# end of Client - 客户端（接收器）配置 
 
 #
-# Server
+# Server - 服务端（探测器）配置
 #
 # default:
 CONFIG_APP_SERVER_BLE_NAME="srvV2"
@@ -891,7 +891,7 @@ CONFIG_APP_SERVER_RADER_HLKLD1040=y
 CONFIG_APP_SERVER_AUTOPWOFF_ENABLED=y
 # default:
 CONFIG_APP_SERVER_AUTOPWOFF_LIMIT=2700
-# end of Server
+# end of Server - 服务端（探测器）配置
 # end of FuckerDetector config
 
 #
