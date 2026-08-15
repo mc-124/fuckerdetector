@@ -5,31 +5,31 @@
 #include "hal/adc_types.h"
 
 #if !defined(CONFIG_IDF_TARGET_ESP32C3)||!CONFIG_IDF_TARGET_ESP32C3
-#   error not supported chip
+    #error not supported chip
 #endif
 
 #if CONFIG_APP_SERVER
-#   define CONFIG_APP_CLIENT 0
+    #define CONFIG_APP_CLIENT 0
 #elif CONFIG_APP_CLIENT
-#   define CONFIG_APP_SERVER 0
+    #define CONFIG_APP_SERVER 0
 #else
-#   error invalid firmware type
+    #error invalid firmware type
 #endif
 
 #if CONFIG_APP_SERVER
-#   define FIRMWARE_TYPE_STRING "Server"
+    #define FIRMWARE_TYPE_STRING "Server"
 #elif CONFIG_APP_CLIENT
-#   define FIRMWARE_TYPE_STRING "Client"
+    #define FIRMWARE_TYPE_STRING "Client"
 #else
-#   error unknown error
+    #error unknown error
 #endif /* CONFIG_APP_SERVER == CONFIG_APP_CLIENT */
 
 #ifdef CONFIG_COMPILER_OPTIMIZATION_LEVEL_DEBUG
-#   define FIRMWARE_VER_TYPE "Debug"
-#   define FIRMWARE_VER_TYPE_SHORT "D"
+    #define FIRMWARE_VER_TYPE "Debug"
+    #define FIRMWARE_VER_TYPE_SHORT "D"
 #else
-#   define FIRMWARE_VER_TYPE "Release"
-#   define FIRMWARE_VER_TYPE_SHORT "R"
+    #define FIRMWARE_VER_TYPE "Release"
+    #define FIRMWARE_VER_TYPE_SHORT "R"
 #endif
 
 static_assert(
@@ -57,26 +57,7 @@ static_assert(
 
 #   define APP_MAINLOOP_DELAY (1000 / CONFIG_APP_CLIENT_MAINLOOP_TPS)
 
-static_assert(
-    CONFIG_APP_SCAN_WINDOW<=CONFIG_APP_SCAN_ITVL,
-    "invalid scan window (must be less than or equal interval)"
-);
-
-static_assert(
-    1<=CONFIG_APP_CLIENT_MAINLOOP_TPS&&CONFIG_APP_CLIENT_MAINLOOP_TPS<=1000,
-    "invalid mainloop tps value"
-);
-
 #endif
-
-static_assert(
-    (
-        CONFIG_APP_ADV_ITVL_MAX>=CONFIG_APP_ADV_ITVL_MIN
-        &&20<=CONFIG_APP_ADV_ITVL_MIN
-        &&CONFIG_APP_ADV_ITVL_MAX<=10240
-    ),
-    "invalid advertising interval"
-);
 
 #if CONFIG_APP_SERVER
 #   define FIRMWARE_BLE_SCAN 0
@@ -93,10 +74,6 @@ static_assert(
 #       define FIRMWARE_BLE_ADV 0
 #   endif
 #endif
-
-static_assert(500<=CONFIG_APP_SERVER_ADV_DURATION&&CONFIG_APP_SERVER_ADV_DURATION<=60000, "invalid server adv duration");
-static_assert(500<=CONFIG_APP_CLIENT_ADV_DURATION&&CONFIG_APP_CLIENT_ADV_DURATION<=60000, "invalid client adv duration");
-static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MAX_NUM<=255, "invalid server sleep interval number");
 
 #define FIRMWARE_VERSION CONFIG_APP_PROJECT_VER
 
@@ -120,6 +97,9 @@ static_assert(2<=CONFIG_APP_SERVER_SLPITVL_MAX_NUM&&CONFIG_APP_SERVER_SLPITVL_MA
     STRINGIFY(__GNUC_PATCHLEVEL__)
 #endif
 
+#define ISEN(__config) 
+
+static_assert(sizeof(long)==sizeof(int), "size error");
 
 // ADC 读取电池 1/2 分压后电压
 #define CHAN_VBAT   ADC_CHANNEL_1

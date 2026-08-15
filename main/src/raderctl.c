@@ -84,7 +84,7 @@ static void raderctl_init_rader(){
         } 
 
         printf("RECEIVED:");
-        for (uint8_t i=0; i<sizeof(resp_buf); i++){
+        for (int i=0; i<sizeof(resp_buf); i++){
             printf(" %hhX", resp_buf[i]);
         }
         println("error: failed");
@@ -107,7 +107,7 @@ static int raderctl_query_th(){
             return th;
         }
         printf("RECEIVED:");
-        for (uint8_t i=0; i<sizeof(resp_buf); i++){
+        for (int i=0; i<sizeof(resp_buf); i++){
             printf(" %hhX", resp_buf[i]);
         }
         println("error: query failed");
@@ -131,7 +131,9 @@ static void raderctl_set_th(int th){
     if (raderctl_recv_bytes(resp_buf, 7)){
         if (memcmp(resp_buf, RESP_SET_TH, sizeof(RESP_SET_TH))!=0){
             printf("RECEIVED:");
-            for (uint8_t i=0; i<sizeof(resp_buf); i++){printf(" %hhX", resp_buf[i]);}
+            for (int i=0; i<sizeof(resp_buf); i++){
+                printf(" %hhX", resp_buf[i]);
+            }
             println("error: set failed");
             return;
         }

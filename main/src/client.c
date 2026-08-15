@@ -1,11 +1,3 @@
-/** @brief 客户端主模块
-### 主要函数
-- `app_init` 初始化外设
-- `app_main_tick` 主循环节拍函数
-- `app_main` 主函数 初始化后运行主循环
-- `app_btn_callback` 按钮回调 使用全局变量通知主函数
-- `app_scan_callback` BLE扫描回调 使用全局变量通知主函数
-*/
 #include "config.h"
 #if CONFIG_APP_CLIENT
 
@@ -48,10 +40,12 @@ enum app_tick_stat {
 
     // page main
 
-    STAT_HOME_START_TRANSMIT_NORMAL_ALARM,
-    STAT_HOME_START_TRANSMIT_LOUD_ALARM,
+    STAT_HOME_START_TRANSMIT_NORMAL_ALARM, // -> STAT_TRANSMITTING_ALARM
+    STAT_HOME_START_TRANSMIT_LOUD_ALARM, // -> STAT_TRANSMITTING_ALARM
     STAT_HOME_SWITCH_TO_SETTINGS,
+
     STAT_TRANSMITTING_ALARM,
+    STAT_SCANNING_RESPONSE,
     STAT_TRANSMITTING_RESPONSE,
 
     // page settings
@@ -69,25 +63,68 @@ enum app_tick_stat {
 
 #define APP_UI_UPDATE_DURATION 30000
 
-/// @brief 按钮事件
+// 按钮事件
 static enum ui_btn_event app_btn_event = 0;
-/// @brief 页索引
+// 页索引
 static enum app_uipage app_current_page = PAGE_HOME;
-/// @brief 主循环节拍状态机标志
+// 主循环节拍状态机标志
 static enum app_tick_stat app_mainloop_stat = STAT_NONE;
-/// @brief 主循环倒计时
+// 主循环倒计时
 static uint32_t app_tick_countdown = 0;
+// 空闲时自动更新UI倒计时
+static uint32_t app_idle_update_ui_countdown = 0;
+// 
+static uint32_t app_ui_settings_index = 0;
 
-#define MS_TO_MAINLOOP_TICKS(__ms) ((uint32_t)(__ms/APP_MAINLOOP_DELAY))
+static uint32_t app_ui_settingsunit_button_index = 0;
 
-#define COUNTDOWN_TRANSMIT_ALARM MS_TO_MAINLOOP_TICKS()
+static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
+    .company_id = CONFIG_APP_BLE_COMPANY_ID,
+    .type = 0,
+    .data.adv_id = 0, // 为 0 时为无响应型广告
+    .protocol_ver = CONFIG_APP_BLE_PROTOCOL_VER
+};
+
+
+
+#define APP_SET_ADV_TYPE(__type) do {app_adv_manfacturer_data.type = __type; } while (0)
+#define APP_START_ADV() do {blelib_adv_start(&app_adv_manfacturer_data, 0); } while (0)
+
+#define MS_TO_TICKS(__ms) ((uint32_t)(__ms/APP_MAINLOOP_DELAY))
+
+#define COUNTDOWN_TRANSMIT_ALARM (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_DURATION))
+#define COUNTDOWN_SCAN_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_SCAN_RESP_DURATION))
+#define COUNTDOWN_TRANSMIT_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
+
+#define COUNTDOWN_IDLE_UPDATE_UI (MS_TO_TICKS(CONFIG_APP_CLIENT_IDLE_UPDATE_UI_INTERVAL))
 
 #if CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
 /// @brief BLE 扫描回调函数
 static void app_scan_callback(const struct ble_gap_ext_disc_desc *){
+    if (app_mainloop_stat == STAT_SCANNING_RESPONSE){
+        // scanning response
+        /// @todo
+        return;
+    }
+    // scanning alarm
 
 }
 #endif // CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
+
+/// @brief 生成并设置广告 ID
+/// 广告 ID 值域：(0x0, 0xffffffff]
+static void app_generate_and_set_adv_id(){
+#if CONFIG_APP_CLIENT_TX_CLIENTRESP
+    uint32_t n = esp_random();
+    if (!n){
+        n = 1;
+    }
+    ESP_LOGI(TAG, "adv_id = %X", n);
+    app_adv_manfacturer_data.data.adv_id = n;
+#else
+    app_adv_manfacturer_data.data.adv_id = 0;
+#endif
+}
 
 /// @brief 按钮事件回调函数
 /// - 在收到按钮事件后会把事件写入到 `app_btn_event`
@@ -130,10 +167,16 @@ static void app_main_handle_button_event(){
         switch (app_btn_event){
         case UI_BTN_SINGLE_CLICK:
             ESP_LOGI(TAG, "transmit normal alarm");
+            if (app_tick_countdown){
+                break;
+            }
             app_mainloop_stat = STAT_HOME_START_TRANSMIT_NORMAL_ALARM;
             break;
         case UI_BTN_DOUBLE_CLICK:
             ESP_LOGI(TAG, "transmit loud alarm");
+            if (app_tick_countdown){
+                break;
+            }
             app_mainloop_stat = STAT_HOME_START_TRANSMIT_LOUD_ALARM;
             break;
         case UI_BTN_LONGPRESS_START:
@@ -198,27 +241,122 @@ static void app_main_handle_button_event(){
     app_btn_event = UI_BTN_NOEVENT;
 }
 
+/// @brief 更新UI
+static void app_update_ui(){
+    ESP_LOGI(TAG, "update ui. page=%d", app_current_page);
+    app_idle_update_ui_countdown = COUNTDOWN_IDLE_UPDATE_UI;
+
+    switch (app_current_page){
+    case PAGE_HOME:
+        ui_showpage_home();
+        break;
+    case PAGE_SETTINGS:
+        ui_showpage_settings(app_ui_settings_index);
+        break;
+    case PAGE_SETTINGSUNIT:
+        ui_showpage_settingsunit(
+            app_ui_settingsunit_button_index, 
+            app_ui_settings_index
+        );
+        break;
+    case PAGE_TRANSMITTING:
+        ui_showpage_transmitting();
+        break;
+    default:
+        ESP_LOGE(TAG, "invalid page: %d", app_current_page);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    }
+}
+
+/// @brief 切换页面
+static void app_switch_page(enum app_uipage page){
+    ESP_LOGI(TAG, "switch page: old=%d new=%d", app_current_page, page);
+    switch (page){
+    case PAGE_HOME:
+        app_ui_settings_index = 0;
+        app_ui_settingsunit_button_index = 0;
+        break;
+    case PAGE_SETTINGS:
+        app_ui_settingsunit_button_index = 0;
+        break;
+    case PAGE_SETTINGSUNIT:
+        break;
+    case PAGE_TRANSMITTING:
+        break;
+    default:
+        ESP_LOGE(TAG, "invalid page: %d", page);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    }
+    app_current_page = page;
+    app_update_ui();
+}
+
 /// @brief 主循环节拍状态机
 static void app_main_tick(){
+    if (app_idle_update_ui_countdown){
+        app_idle_update_ui_countdown--;
+    }
+    if (app_tick_countdown){
+        app_tick_countdown--;
+    }
+
     switch (app_mainloop_stat) {
     case STAT_NONE:
+        if (app_idle_update_ui_countdown==0){
+            app_update_ui();
+        }
+        if (app_tick_countdown){
+            // 发送冷却期
+            break;
+        }
         if (app_btn_event != UI_BTN_NOEVENT){
             app_main_handle_button_event();
         }
         break;
     case STAT_HOME_START_TRANSMIT_NORMAL_ALARM:
         blelib_scan_stop();
-        
+        APP_SET_ADV_TYPE(ADVTYPE_CLIENT_ALARM);
+        app_generate_and_set_adv_id();
+        APP_START_ADV();
+        app_switch_page(PAGE_TRANSMITTING);
+        app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
         app_mainloop_stat = STAT_TRANSMITTING_ALARM;
         break;
     case STAT_HOME_START_TRANSMIT_LOUD_ALARM:
         blelib_scan_stop();
-
+        APP_SET_ADV_TYPE(ADVTYPE_CLIENT_LOUD);
+        app_generate_and_set_adv_id();
+        APP_START_ADV();
+        app_switch_page(PAGE_TRANSMITTING);
+        app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
+        app_mainloop_stat = STAT_TRANSMITTING_ALARM;
         break;
     case STAT_HOME_SWITCH_TO_SETTINGS:
+        app_switch_page(PAGE_SETTINGS);
+        app_mainloop_stat = STAT_NONE;
         break;
     
     case STAT_TRANSMITTING_ALARM:
+        if (app_tick_countdown){
+            break;
+        }
+        blelib_adv_stop();
+        blelib_scan_start(0);
+        #if CONFIG_APP_CLIENT_RX_CLIENTRESP
+            app_tick_countdown = COUNTDOWN_SCAN_RESP;
+            app_mainloop_stat = STAT_SCANNING_RESPONSE;
+        #endif // CONFIG_APP_CLIENT_RX_CLIENTRESP
+        break;
+    case STAT_SCANNING_RESPONSE:
+        if (CONFIG_APP_CLIENT_RX_CLIENTRESP){
+            if (app_tick_countdown){
+                break;
+            }
+            blelib_scan_stop();
+        } else {
+            ESP_LOGE(TAG, "unsupport receive response");
+            ESP_ERROR_CHECK(ESP_ERR_NOT_SUPPORTED);
+        }
         break;
     case STAT_TRANSMITTING_RESPONSE:
         break;
@@ -293,7 +431,7 @@ void app_main(){
 
     // 开机画面
     ui_showpage_launch();
-    ui_showpage_main();
+    ui_showpage_home();
 
 #if APP_MAINLOOP_DELAY
     TickType_t tick_count = xTaskGetTickCount();

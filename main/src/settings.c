@@ -26,7 +26,7 @@ static void set_nvs_sleepinterval_index(uint8_t index){
 
 void settings_reset_all_timelib_slpitvl_array(){
     ESP_LOGI(TAG, "Reset sleep intervals");
-    for (uint8_t i=0;i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM;i++){
+    for (int i=0;i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM;i++){
         set_nvs_sleepinterval_index(i);
         ESP_LOGI(TAG, "Write: %s", settings_nvs_key);
         ESP_ERROR_CHECK(nvs_set_u64(ns_h, settings_nvs_key, FFFF_U64));
@@ -65,7 +65,7 @@ void settings_init(){
 
 void settings_load(){
     ESP_LOGI(TAG, "loading settings");
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *si = &timelib_slpitvl_array[i];
         uint64_t u64 = FFFF_U64;
         set_nvs_sleepinterval_index(i);
@@ -87,7 +87,7 @@ void settings_store(){
     ESP_LOGI(TAG, "storing settings");
     timelib_check_slpitvl();
     bool changed = false;
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *si = &timelib_slpitvl_array[i];
         if (!memcmp(si, &settings_old_slpitvl_array[i], 8)) 
             continue;
@@ -142,7 +142,7 @@ static void cmd_addsleep(uint8_t argc, const char **args){
     int end_time = end_hour*3600 + end_minute*60 + end_second;
     
     struct timelib_slpitvl *freeslot = NULL;
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *this = &timelib_slpitvl_array[i];
         if (this->start==FFFF_U32||this->end==FFFF_U32){
             freeslot = this;
@@ -434,7 +434,7 @@ static void cmd_settings(uint8_t argc, const char **args){
             settings_human_rw(index, true, &raw_value);
         }
     } else if (argc==1&&!strcmp(mode, "list")){
-        for (uint8_t i=0; i<SETTINGS_SET_NUM; i++){
+        for (int i=0; i<SETTINGS_SET_NUM; i++){
             const struct settings_config_desc *desc = &settings_config_list[i];
             uint8_t value;
             settings_human_rw(i, false, &value);

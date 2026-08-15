@@ -28,9 +28,7 @@ menu "FuckerDetector config"
 
     menu "Client - 客户端（接收器）配置 "
 
-        config APP_CLIENT_BLE_NAME
-            string "广告包设备名称（长度小于 16 字节）"
-            default "cliV2"
+        # functions
 
         config APP_CLIENT_RX_SERVERALARM
             bool "允许接收服务端警报"
@@ -39,70 +37,101 @@ menu "FuckerDetector config"
         config APP_CLIENT_TX_CLIENTALARM
             bool "允许发送客户端警报"
             default y
+
+        config APP_CLIENT_TX_LOUDALARM
+            bool "允许发送客户端强力警报"
+            default y
         
         config APP_CLIENT_RX_CLIENTALARM
             bool "允许接收客户端警报"
             default y 
 
+        config APP_CLIENT_RX_LOUDALARM
+            bool "允许接收客户端强力警报"
+            default y 
+
         config APP_CLIENT_TX_CLIENTRESP
-            bool "允许发送客户端响应包"
+            bool "允许发送客户端响应"
             default y
             depends on APP_CLIENT_RX_CLIENTALARM
 
         config APP_CLIENT_RX_CLIENTRESP
-            bool "允许接收客户端响应包"
+            bool "允许接收客户端响应"
             default y 
-            depends on APP_CLIENT_TX_CLIENTALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
 
-        config APP_CLIENT_MAINLOOP_TPS
-            int "主循环 TPS （设置 0 则无等待）"
-            default 20
-            range 1 1000
+        # ble
 
-        # ble advertising
-
-        config APP_CLIENT_ADV_DURATION
-            int "广告持续时间 (ms)"
-            range 500 60000
-            default 3000
-            depends on APP_CLIENT_TX_CLIENTALARM
+        config APP_CLIENT_BLE_NAME
+            string "广告包设备名称（长度小于 16 字节）"
+            default "cliV2"
 
         config APP_CLIENT_ADV_ITVL_MAX
             int "最大广告间隔 (ms)"
             range 20 10240
             default 128
-            depends on APP_CLIENT_TX_CLIENTALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
         
         config APP_CLIENT_ADV_ITVL_MIN
             int "最小广告间隔 (ms)"
             range 20 10240
             default 32
-            depends on APP_CLIENT_TX_CLIENTALARM
-
-        # ble scanning
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
 
         config APP_CLIENT_SCAN_ITVL
             int "扫描间隔 (ms)"
             range 20 10240
             default 96
-            depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
+            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_LOUDALARM
 
         config APP_CLIENT_SCAN_WINDOW
             int "扫描窗口 (ms)"
             range 20 10240
             default 48
-            depends on APP_CLIENT_RX_SERVERALARM && APP_CLIENT_RX_CLIENTALARM
+            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_LOUDALARM
 
-        config APP_CLIENT_RESP_SCAN_DURATION
-            int "扫描响应包持续时间 (ms)"
-            range 500 60000
-            default 2000
+        # times
+
+        config APP_CLIENT_TRANSMIT_ALARM_DURATION
+            int "发送警告广告包持续时间 (ms)"
+            range 500 10000
+            default 1500
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+        
+        config APP_CLIENT_TRANSMIT_ALARM_INTERVAL
+            int "发送警告广告包后的冷却期 (ms)"
+            range 1 10000
+            default 1000
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+
+        config APP_CLIENT_TRANSMIT_RESP_DURATION
+            int "发送响应广告包持续时间 (ms)"
+            range 500 10000
+            default 1500
+            depends on APP_CLIENT_TX_CLIENTRESP || APP_CLIENT_TX_LOUDALARM
+
+        config APP_CLIENT_SCAN_RESP_DURATION
+            int "扫描响应广告包持续时间 (ms)"
+            range 500 10000
+            default 1500
             depends on APP_CLIENT_RX_CLIENTRESP
 
+        config APP_CLIENT_IDLE_UPDATE_UI_INTERVAL
+            int "空闲时更新 UI 间隔 (ms)"
+            range 500 100000000
+            default 60000
+
+        # other
+
         config APP_CLIENT_VIBRATION_PWM_FREQ
-            int "震动频率 (Hz)"
+            int "震动 PWM 频率 (Hz)"
             range 0 16383
             default 200
+
+        config APP_CLIENT_MAINLOOP_TPS
+            int "主循环 TPS （设置 0 则无等待）"
+            default 20
+            range 1 1000
 
     endmenu
 

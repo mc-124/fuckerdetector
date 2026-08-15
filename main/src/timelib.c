@@ -58,7 +58,7 @@ int timelib_get_day_sec(){
 }
 
 const struct timelib_slpitvl *timelib_find_inprog_slpitvl(int now){
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *this = &timelib_slpitvl_array[i];
         if (this->start==FFFF_U32||this->end==FFFF_U32){
             continue;
@@ -73,7 +73,7 @@ const struct timelib_slpitvl *timelib_find_inprog_slpitvl(int now){
 const struct timelib_slpitvl *timelib_find_next_slpitvl(int now){
     struct timelib_slpitvl *min = NULL;
     int min_diff = 0;
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *this = &timelib_slpitvl_array[i];
         if (this->start==FFFF_U32||this->end==FFFF_U32){
             continue;
@@ -100,7 +100,7 @@ void timelib_print_slpitvl(const struct timelib_slpitvl *slpitvl){
 }
 
 void timelib_print_all_slpitvl(){
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         const struct timelib_slpitvl *slpitvl = &timelib_slpitvl_array[i];
         printf("[%hhd]: ", i);
         timelib_print_slpitvl(slpitvl);
@@ -108,7 +108,7 @@ void timelib_print_all_slpitvl(){
 }
 
 void timelib_check_slpitvl(){
-    for (uint8_t i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
+    for (int i=0; i<CONFIG_APP_SERVER_SLPITVL_MAX_NUM; i++){
         struct timelib_slpitvl *slpitvl = &timelib_slpitvl_array[i];
         if (slpitvl->start==slpitvl->end
             ||!(0<=slpitvl->start&&slpitvl->start<86400)

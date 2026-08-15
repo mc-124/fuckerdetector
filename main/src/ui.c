@@ -205,6 +205,7 @@ void ui_init(){
 #define ui_get_en_center_x(__u8Length) ((uint8_t)(64-((__u8Length*6)/2)))
 #define ui_get_txt_center_y(__u8Length) ((uint8_t)(32-((__u8Length*12)/2)))
 
+// 显示启动画面并延迟一定时间
 void ui_showpage_launch(){
     ESP_LOGI(TAG, "showpage: launch");
     ui_clear();
@@ -230,15 +231,16 @@ void ui_showpage_launch(){
     ui_oled_invert(false);
 }
 
-void ui_showpage_main(){
-    ESP_LOGI(TAG, "showpage: main");
+// 显示主页
+void ui_showpage_home(){
+    ESP_LOGI(TAG, "showpage: home");
     ui_clear();
     ui_setfont(FONT_1);
     char buf[21];
     uint8_t y = 0;
     snprintf(buf, sizeof(buf), "SCANNING [%s]%4.2fV", ui_self_mac_string, misc_vbat_read());
     u8g2_DrawStr(oled, 0, y, buf);
-    for (uint8_t i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
+    for (int i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
         const struct ui_alarmdev *this = ui_get_alarmdev(i);
         y += 8;
         if (this){
@@ -249,16 +251,19 @@ void ui_showpage_main(){
     ui_update();
 }
 
+// 高亮行（FONT_0）：开始
 static void ui_white_line_start(uint8_t y){
     u8g2_SetDrawColor(oled, 1);
     u8g2_DrawBox(oled, 0, y, 127, y+12);
     u8g2_SetDrawColor(oled, 0);
 }
+// 高亮行（FONT_1）：开始
 static void ui_white_line_start_font1(uint8_t y){
     u8g2_SetDrawColor(oled, 1);
     u8g2_DrawBox(oled, 0, y, 127, y+8);
     u8g2_SetDrawColor(oled, 0);
 }
+// 高亮行：结束
 static void ui_white_line_end(){
     u8g2_SetDrawColor(oled, 1);
 }
@@ -273,15 +278,18 @@ static void ui_white_line_end(){
             ui_white_line_end();            \
     } while (0)
 
-void ui_showpage_settings(uint8_t button_index){
-    ESP_LOGI(TAG, "showpage: settings[%hhu]", button_index);
+/// @brief 显示页面：设置列表
+/// @param settings_index 设置索引
+/// @note 当 `settings_index` == 12 时，将会显示“信息”页面
+void ui_showpage_settings(uint8_t settings_index){
+    ESP_LOGI(TAG, "showpage: settings[%hhu]", settings_index);
     ui_clear();
     ui_setfont(FONT_0);
-    uint8_t subpage_index = button_index / 4;
-    uint8_t pagebtn_index = button_index % 4;
+    uint8_t subpage_index = settings_index / 4;
+    uint8_t pagebtn_index = settings_index % 4;
     const struct settings_config_desc *desc = NULL;
-    if (button_index<3){
-        desc = &settings_config_list[button_index];
+    if (subpage_index<3){
+        desc = &settings_config_list[settings_index];
     }
     switch (subpage_index){
     case 0:
@@ -305,7 +313,7 @@ void ui_showpage_settings(uint8_t button_index){
         __X_DRAWLINE(2);
         __X_DRAWLINE(3);
         break;
-    default:
+    case 3:
         u8g2_DrawStr(oled, ui_get_zh_center_x(4), 0, "设置 4/4");
         u8g2_DrawStr(oled, 0, 16, "版本: " FIRMWARE_VER_TYPE_SHORT "-" FIRMWARE_VERSION);
     
@@ -313,15 +321,21 @@ void ui_showpage_settings(uint8_t button_index){
         u8g2_DrawStr(oled, ui_get_zh_center_x(2), 52, "退出");
         ui_white_line_end();
         break;
+    default:
+        ESP_LOGE(TAG, "unknown error: subpage=%hhu pagebtn=%hhu", subpage_index, pagebtn_index);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
     ui_update();
 }
 #undef __X_DRAWLINE
 
-void ui_showpage_settingsunit(uint8_t button_index, uint8_t settings_index){
-    ESP_LOGI(TAG, "showpage: settingsunit[%hhu]", button_index);
-    if (button_index>=SETTINGS_SET_NUM){
-        ESP_LOGE(TAG, "invalid button_index");
+/// @brief 显示页面：设置单元
+/// @param settings_index 设置索引
+/// @param button_index 设置单元按钮索引
+void ui_showpage_settingsunit(uint8_t settings_index, uint8_t button_index){
+    ESP_LOGI(TAG, "showpage: settingsunit[%hhu:%hhu]", settings_index, button_index);
+    if (settings_index>=SETTINGS_SET_NUM){
+        ESP_LOGE(TAG, "invalid settings index");
         return;
     }
     ui_clear();
@@ -368,7 +382,7 @@ void ui_showpage_transmitting(){
 
     uint8_t y = 8;
     char buf[21];
-    for (uint8_t i=0; i<ui_respdev_list_len; i++){
+    for (int i=0; i<ui_respdev_list_len; i++){
         struct ui_respdev dev = ui_respdev_list[i];
         if (dev.rssi){
             snprintf(buf, sizeof(buf), "Found [%04hX] %4hhddBm", dev.short_mac, dev.rssi);

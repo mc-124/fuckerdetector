@@ -36,7 +36,7 @@ static const struct repl_command *repl_find_command(const char *name, uint8_t na
         return NULL;
     }
     uint32_t name_crc32 = esp_crc32_le(REPL_CRC32_DEFAULT, (const uint8_t*)name, name_len);
-    for (uint8_t i=0; i<ctx->cmdc; i++){
+    for (int i=0; i<ctx->cmdc; i++){
         const struct repl_command *cmd = &ctx->cmds[i];
         if (!cmd->func){
             continue;
@@ -77,7 +77,7 @@ static void cmd_help(uint8_t argc, const char **args){
         printfln("- (%s): %s", cmd->name, cmd->prompt);        
     } else if (argc==0){
         println("-------- HELP --------");
-        for (uint8_t i=0; i<REPL_MAX_CMDS; i++){
+        for (int i=0; i<REPL_MAX_CMDS; i++){
             const struct repl_command *cmd = &ctx->cmds[i];
             if (!cmd->func) return;
             printfln("- (%s): %s", cmd->name, cmd->prompt);
@@ -145,7 +145,7 @@ void repl_init(){
     }
     repl_rst_ctx();
     memset(ctx->cmds, 0, sizeof(ctx->cmds));
-    for (uint8_t i=0; i<REPL_MAX_ARGS; i++){
+    for (int i=0; i<REPL_MAX_ARGS; i++){
         ctx->args_array[i] = ctx->args_strbuf[i];
     }
     ctx->cmdc = 0;
