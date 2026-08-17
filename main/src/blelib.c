@@ -208,7 +208,7 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
         1, 
         &flags
     );
-    blelib_add_data_to_payload(
+    blelib_add_data_to_payload( // 
         payload, 
         &payload_len, 
         BLE_HS_ADV_TYPE_COMP_NAME, 
@@ -222,6 +222,8 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
         sizeof(struct blelib_adv_manfacturer_data), 
         data
     );
+
+    //assert(payload_len==BLELIB_ADV_PAYLOAD_SIZE);
 
     //printfln("payload_len = %d", payload_len);
 
@@ -310,9 +312,9 @@ void blelib_scan_stop(){
     ESP_LOGI(TAG, "scan stopped");
 }
 
-bool blelib_iter_payload_fields(const uint8_t *start_ptr, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result){
-    const uint8_t *end_ptr = start_ptr + size;
-    if (*cur_ptr<start_ptr||*cur_ptr>=end_ptr){
+bool blelib_iter_payload_fields(const uint8_t *payload_buf, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result){
+    const uint8_t *const end_ptr = payload_buf + size;
+    if (*cur_ptr<payload_buf||*cur_ptr>=end_ptr){
         return false;
     }
     uint8_t field_len = **cur_ptr;

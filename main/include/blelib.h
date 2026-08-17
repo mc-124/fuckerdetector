@@ -30,6 +30,12 @@ inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/1
 #define APP_BLE_NAME CONFIG_APP_CLIENT_BLE_NAME
 #endif
 
+//#define BLELIB_ADV_PAYLOAD_SIZE (\
+//    (1+1) /* Flags */ \
+//    +(1+sizeof(APP_BLE_NAME)-1) /* Name */ \
+//    +(1+sizeof(struct blelib_adv_manfacturer_data)) /* ManfacturerData */ \
+//)
+
 #pragma pack(1)
 struct blelib_adv_manfacturer_data {
     uint16_t company_id;
@@ -105,11 +111,12 @@ void blelib_scan_start(uint32_t scan_time);
 void blelib_scan_stop();
 
 /// @brief 迭代 ADStructure 里的每个字段
-/// @param start_ptr 缓冲区起始指针
-/// @param size 缓冲区大小
+/// @param payload_buf payload缓冲区指针
+/// @param size payload缓冲区大小
 /// @param cur_ptr 当前指针
 /// @param result 迭代结果
 /// @return 是否成功
-bool blelib_iter_payload_fields(const uint8_t *start_ptr, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result);
+/// @note 结束迭代时
+bool blelib_iter_payload_fields(const uint8_t *payload_buf, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result);
 
 #endif // FIRMWARE_BLE_SCAN

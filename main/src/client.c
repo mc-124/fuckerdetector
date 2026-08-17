@@ -36,7 +36,7 @@ enum app_uipage {
 };
 
 enum app_tick_stat {
-    STAT_NONE,
+    STAT_IDLE,
 
     // page main
 
@@ -46,6 +46,8 @@ enum app_tick_stat {
 
     STAT_TRANSMITTING_ALARM,
     STAT_SCANNING_RESPONSE,
+
+    STAT_START_TRANSMIT_RESPONSE,
     STAT_TRANSMITTING_RESPONSE,
 
     // page settings
@@ -68,7 +70,7 @@ static enum ui_btn_event app_btn_event = 0;
 // 页索引
 static enum app_uipage app_current_page = PAGE_HOME;
 // 主循环节拍状态机标志
-static enum app_tick_stat app_mainloop_stat = STAT_NONE;
+static enum app_tick_stat app_mainloop_stat = STAT_IDLE;
 // 主循环倒计时
 static uint32_t app_tick_countdown = 0;
 // 空闲时自动更新UI倒计时
@@ -95,19 +97,34 @@ static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
 #define COUNTDOWN_TRANSMIT_ALARM (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_DURATION))
 #define COUNTDOWN_SCAN_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_SCAN_RESP_DURATION))
 #define COUNTDOWN_TRANSMIT_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
+#define COUNTDOWN_ALARM_ITVL (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_INTERVAL))
 
 #define COUNTDOWN_IDLE_UPDATE_UI (MS_TO_TICKS(CONFIG_APP_CLIENT_IDLE_UPDATE_UI_INTERVAL))
 
 #if CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
-/// @brief BLE 扫描回调函数
-static void app_scan_callback(const struct ble_gap_ext_disc_desc *){
-    if (app_mainloop_stat == STAT_SCANNING_RESPONSE){
-        // scanning response
-        /// @todo
-        return;
-    }
-    // scanning alarm
 
+/// @brief BLE 扫描回调函数
+static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
+    if (!(
+        (
+            app_mainloop_stat == STAT_IDLE
+            ||(
+                IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
+                &&app_mainloop_stat == STAT_SCANNING_RESPONSE
+            )
+        )
+        && (
+            d->prim_phy == BLE_HCI_LE_PHY_CODED
+            && d->sec_phy == BLE_HCI_LE_PHY_CODED
+            && d->data_status == BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE
+        )
+    )) return;
+
+    const uint8_t *end_p;
+    struct blelib_payload_field field;
+    while (blelib_iter_payload_fields(d->data, d->length_data, &end_p, &field)) {
+        /// @todo
+    }
 }
 #endif // CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
 
@@ -301,7 +318,7 @@ static void app_main_tick(){
     }
 
     switch (app_mainloop_stat) {
-    case STAT_NONE:
+    case STAT_IDLE:
         if (app_idle_update_ui_countdown==0){
             app_update_ui();
         }
@@ -333,7 +350,7 @@ static void app_main_tick(){
         break;
     case STAT_HOME_SWITCH_TO_SETTINGS:
         app_switch_page(PAGE_SETTINGS);
-        app_mainloop_stat = STAT_NONE;
+        app_mainloop_stat = STAT_IDLE;
         break;
     
     case STAT_TRANSMITTING_ALARM:
@@ -342,23 +359,28 @@ static void app_main_tick(){
         }
         blelib_adv_stop();
         blelib_scan_start(0);
-        #if CONFIG_APP_CLIENT_RX_CLIENTRESP
-            app_tick_countdown = COUNTDOWN_SCAN_RESP;
-            app_mainloop_stat = STAT_SCANNING_RESPONSE;
-        #endif // CONFIG_APP_CLIENT_RX_CLIENTRESP
+        app_mainloop_stat = STAT_SCANNING_RESPONSE;
+        app_tick_countdown = COUNTDOWN_SCAN_RESP;
         break;
     case STAT_SCANNING_RESPONSE:
-        if (CONFIG_APP_CLIENT_RX_CLIENTRESP){
-            if (app_tick_countdown){
-                break;
-            }
-            blelib_scan_stop();
-        } else {
-            ESP_LOGE(TAG, "unsupport receive response");
-            ESP_ERROR_CHECK(ESP_ERR_NOT_SUPPORTED);
+        if (IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP) && app_tick_countdown){
+            break;
         }
+        app_mainloop_stat = STAT_IDLE;
+        app_tick_countdown = COUNTDOWN_ALARM_ITVL;
+        app_switch_page(PAGE_HOME);
+        break;
+        
+    case STAT_START_TRANSMIT_RESPONSE:
+        app_tick_countdown = COUNTDOWN_TRANSMIT_RESP;
+        app_mainloop_stat = STAT_TRANSMITTING_RESPONSE;
         break;
     case STAT_TRANSMITTING_RESPONSE:
+        if (IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP) && app_tick_countdown){
+            break;
+        }
+        app_tick_countdown = 0;
+        app_mainloop_stat = STAT_IDLE;
         break;
 
     case STAT_SETTINGS_SWITCH_NEXT_ITEM:

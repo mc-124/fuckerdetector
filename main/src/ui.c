@@ -173,11 +173,12 @@ static void ui_oled_invert(bool en){
     ESP_ERROR_CHECK(i2c_master_transmit(ctx.dev_handle, &cmd, 1, 100));
 }
 
-static void ui_clear(){
+static inline void ui_clear(){
     u8g2_ClearBuffer(oled);
 }
 
-static void ui_update(){
+static inline void ui_update(){
+    ESP_LOGI(TAG, "updating ui");
     u8g2_SendBuffer(oled);
 }
 
@@ -201,9 +202,9 @@ void ui_init(){
 // FONT_0
 
 #define ui_setfont(__font) u8g2_SetFont(oled, __font)
-#define ui_get_zh_center_x(__u8Length) ((uint8_t)(64-((__u8Length*12)/2)))
-#define ui_get_en_center_x(__u8Length) ((uint8_t)(64-((__u8Length*6)/2)))
-#define ui_get_txt_center_y(__u8Length) ((uint8_t)(32-((__u8Length*12)/2)))
+#define ui_get_zh_center_x(__u8Length) ((uint8_t)(64-(((__u8Length)*12)/2)))
+#define ui_get_en_center_x(__u8Length) ((uint8_t)(64-(((__u8Length)*6)/2)))
+#define ui_get_txt_center_y(__u8Length) ((uint8_t)(32-(((__u8Length)*12)/2)))
 
 // 显示启动画面并延迟一定时间
 void ui_showpage_launch(){
@@ -390,6 +391,34 @@ void ui_showpage_transmitting(){
         }
         y += 8;
     }
+    ui_update();
+}
+
+void ui_showpage_alarming(uint16_t short_addr, uint8_t alarm_type){
+    ESP_LOGI(TAG, "showpage: alarming[%hX]", short_addr);
+    ui_clear();
+    ui_setfont(FONT_0);
+    char title_buf[24];
+
+    switch (alarm_type){
+    case ADVTYPE_SERVER_ALARM:
+        ESP_LOGI(TAG, "type: server alarm");
+        snprintf(title_buf, sizeof(title_buf), "[%hX]探测器报警", short_addr);
+        break;
+    case ADVTYPE_CLIENT_ALARM:
+        ESP_LOGI(TAG, "type: client alarm");
+        snprintf(title_buf, sizeof(title_buf), "[%hX]普通警报", short_addr);
+        break;
+    case ADVTYPE_CLIENT_LOUD:
+        ESP_LOGI(TAG, "type: client loud alarm");
+        snprintf(title_buf, sizeof(title_buf), "[%hX]强力警报", short_addr);
+        break;
+    default:
+        ESP_LOGE(TAG, "invalid alarm type: %hhu", alarm_type);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    }
+
+    u8g2_DrawStr(oled, 0, ui_get_txt_center_y(1), title_buf);
     ui_update();
 }
 

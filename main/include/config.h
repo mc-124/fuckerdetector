@@ -97,7 +97,11 @@ static_assert(
     STRINGIFY(__GNUC_PATCHLEVEL__)
 #endif
 
-#define ISEN(__config) 
+#define __SECARG(__ignored, __output, ...) __output
+#define __IS_ENABLED__ARG_PH_1 0,
+#define __IS_ENABLED_1(__x) __SECARG(__x 1, 0)
+#define __IS_ENABLED_0(__n) __IS_ENABLED_1(__IS_ENABLED__ARG_PH_##__n)
+#define IS_ENABLED(__n) __IS_ENABLED_0(__n)
 
 static_assert(sizeof(long)==sizeof(int), "size error");
 
