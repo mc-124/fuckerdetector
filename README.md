@@ -5,10 +5,6 @@
 
 本项目使用ESP-IDF v6.0.2，依赖项请看 `main/idf_component.yml`
 
-这个项目没有编码规范，主要是不能有箭头代码和巨长的一行
-
-少用 `uint8_t` 当局部变量
-
 ## 引脚
 |Pin    |Mode           |Type       |Desc                   |
 |-      |-              |-          |-                      |

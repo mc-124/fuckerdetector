@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "esp_random.h"
+#include "freertos/FreeRTOS.h"
 
 static const char *TAG = "main";
 
@@ -50,6 +51,14 @@ enum app_tick_stat {
     STAT_START_TRANSMIT_RESPONSE,
     STAT_TRANSMITTING_RESPONSE,
 
+    STAT_STARTV_SERVER_ALARM,
+    STAT_STARTV_CLIENT_ALARM,
+    STAT_STARTV_CLIENT_LOUD,
+    STAT_VIBRATING,
+
+    STAT_START_RESPONSE,
+    STAT_SENDING_RESPONSE,
+
     // page settings
 
     STAT_SETTINGS_SWITCH_NEXT_ITEM,
@@ -80,14 +89,15 @@ static uint32_t app_ui_settings_index = 0;
 
 static uint32_t app_ui_settingsunit_button_index = 0;
 
+/// @todo
+static SemaphoreHandle_t app_lock = 0;
+
 static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
     .company_id = CONFIG_APP_BLE_COMPANY_ID,
     .type = 0,
     .data.adv_id = 0, // 为 0 时为无响应型广告
     .protocol_ver = CONFIG_APP_BLE_PROTOCOL_VER
 };
-
-
 
 #define APP_SET_ADV_TYPE(__type) do {app_adv_manfacturer_data.type = __type; } while (0)
 #define APP_START_ADV() do {blelib_adv_start(&app_adv_manfacturer_data, 0); } while (0)
@@ -103,27 +113,115 @@ static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
 
 #if CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
 
-/// @brief BLE 扫描回调函数
-static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
-    if (!(
-        (
-            app_mainloop_stat == STAT_IDLE
-            ||(
-                IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
-                &&app_mainloop_stat == STAT_SCANNING_RESPONSE
+/// @brief 检查 blelib_adv_manfacturer_data 有效性
+static bool app_is_valid_mfdata(const struct blelib_adv_manfacturer_data *mfdata){
+    assert(mfdata);
+
+    if (
+        mfdata->company_id != CONFIG_APP_BLE_COMPANY_ID 
+        || mfdata->protocol_ver != CONFIG_APP_BLE_PROTOCOL_VER
+        || (mfdata->type & 0x80 && mfdata->encoded_vbat)
+        || (
+            mfdata->type != ADVTYPE_SERVER_ALARM
+            && mfdata->type != ADVTYPE_CLIENT_ALARM
+            && mfdata->type != ADVTYPE_CLIENT_LOUD
+            && (
+                !IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
+                || mfdata->type != ADVTYPE_CLIENT_RESPONSE
             )
         )
-        && (
-            d->prim_phy == BLE_HCI_LE_PHY_CODED
-            && d->sec_phy == BLE_HCI_LE_PHY_CODED
-            && d->data_status == BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE
-        )
-    )) return;
+    ) return false;
 
-    const uint8_t *end_p;
+    return true;
+}
+
+/// @brief BLE 扫描回调函数
+static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
+    bool scanning_resp = (
+        IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
+        && app_mainloop_stat == STAT_SCANNING_RESPONSE
+    );
+    
+    if (
+        app_current_page != PAGE_HOME
+        || (
+            app_mainloop_stat != STAT_IDLE
+            && !scanning_resp
+        )
+    ){
+        return;
+    }
+
+    if (d->data_status != BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE){
+        return;
+    }
+
+    bool found_flags = false;
+    bool found_name = false;
+    bool found_mfdata = false;
+    
     struct blelib_payload_field field;
-    while (blelib_iter_payload_fields(d->data, d->length_data, &end_p, &field)) {
-        /// @todo
+    struct blelib_adv_manfacturer_data mfdata;
+    const uint8_t *cur_ptr = NULL;
+
+    while (
+        blelib_iter_payload_fields(
+            d->data,
+            d->length_data, 
+            &cur_ptr, 
+            &field
+        )
+    ){
+        if (field.type == BLE_HS_ADV_TYPE_FLAGS){
+            if (found_flags) 
+                return;
+            if (*field.data != BLELIB_ADV_FLAGS)
+                return;
+            found_flags = true;
+        } else if (field.type == BLE_HS_ADV_TYPE_COMP_NAME){
+            if (found_name)
+                return;
+            found_name = true;
+        } else if (field.type == BLE_HS_ADV_TYPE_MFG_DATA){
+            if (found_mfdata)
+                return;
+            memcpy(&mfdata, field.data, sizeof(struct blelib_adv_manfacturer_data));
+            if (!app_is_valid_mfdata(&mfdata))
+                return;
+            found_mfdata = true;
+        }
+    }
+    if (!found_flags || !found_name || !found_mfdata){
+        return;
+    }
+
+    switch (mfdata.type){ /// @todo
+    case ADVTYPE_SERVER_ALARM:
+        if (scanning_resp)
+            break;
+        ESP_LOGI(TAG ,"found server alarm");
+        app_mainloop_stat = STAT_STARTV_SERVER_ALARM;
+        break;
+    case ADVTYPE_CLIENT_ALARM:
+        if (scanning_resp)
+            break;
+        ESP_LOGI(TAG, "found client alarm");
+        app_mainloop_stat = STAT_STARTV_CLIENT_ALARM;
+        break;
+    case ADVTYPE_CLIENT_LOUD:
+        if (scanning_resp)
+            break;
+        ESP_LOGI(TAG, "found client loud alarm");
+        app_mainloop_stat = STAT_STARTV_CLIENT_LOUD;
+        break;
+    case ADVTYPE_CLIENT_RESPONSE:
+        if (!scanning_resp)
+            break;
+        ESP_LOGI(TAG, "found client response");
+        app_mainloop_stat = STAT_START_RESPONSE;
+        break;
+    default:
+        assert(0);
     }
 }
 #endif // CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM

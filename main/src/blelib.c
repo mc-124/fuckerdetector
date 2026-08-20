@@ -313,6 +313,11 @@ void blelib_scan_stop(){
 }
 
 bool blelib_iter_payload_fields(const uint8_t *payload_buf, uint16_t size, const uint8_t **cur_ptr, struct blelib_payload_field *result){
+    assert(cur_ptr);
+    if (!*cur_ptr){
+        *cur_ptr = payload_buf;
+    }
+
     const uint8_t *const end_ptr = payload_buf + size;
     if (*cur_ptr<payload_buf||*cur_ptr>=end_ptr){
         return false;
