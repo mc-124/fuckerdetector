@@ -51,9 +51,7 @@ enum app_tick_stat {
     STAT_START_TRANSMIT_RESPONSE,
     STAT_TRANSMITTING_RESPONSE,
 
-    STAT_STARTV_SERVER_ALARM,
-    STAT_STARTV_CLIENT_ALARM,
-    STAT_STARTV_CLIENT_LOUD,
+    STAT_START_VIBRATION,
     STAT_VIBRATING,
 
     STAT_START_RESPONSE,
@@ -90,7 +88,7 @@ static uint32_t app_ui_settings_index = 0;
 static uint32_t app_ui_settingsunit_button_index = 0;
 
 /// @todo
-static SemaphoreHandle_t app_lock = 0;
+static SemaphoreHandle_t app_lock = NULL;
 
 static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
     .company_id = CONFIG_APP_BLE_COMPANY_ID,
@@ -98,6 +96,16 @@ static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
     .data.adv_id = 0, // 为 0 时为无响应型广告
     .protocol_ver = CONFIG_APP_BLE_PROTOCOL_VER
 };
+
+static inline void app_lock_get(){
+    assert(app_lock);
+    xSemaphoreTake(app_lock, portMAX_DELAY);
+}
+
+static inline void app_lock_put(){
+    assert(app_lock);
+    xSemaphoreGive(app_lock);
+}
 
 #define APP_SET_ADV_TYPE(__type) do {app_adv_manfacturer_data.type = __type; } while (0)
 #define APP_START_ADV() do {blelib_adv_start(&app_adv_manfacturer_data, 0); } while (0)
@@ -195,33 +203,48 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
         return;
     }
 
+    enum app_tick_stat new_stat = 0;
+
     switch (mfdata.type){ /// @todo
     case ADVTYPE_SERVER_ALARM:
-        if (scanning_resp)
-            break;
-        ESP_LOGI(TAG ,"found server alarm");
-        app_mainloop_stat = STAT_STARTV_SERVER_ALARM;
-        break;
+        [[fallthrough]];
     case ADVTYPE_CLIENT_ALARM:
-        if (scanning_resp)
-            break;
-        ESP_LOGI(TAG, "found client alarm");
-        app_mainloop_stat = STAT_STARTV_CLIENT_ALARM;
-        break;
+        [[fallthrough]];
     case ADVTYPE_CLIENT_LOUD:
         if (scanning_resp)
             break;
-        ESP_LOGI(TAG, "found client loud alarm");
-        app_mainloop_stat = STAT_STARTV_CLIENT_LOUD;
-        break;
+        ESP_LOGI(TAG, "found alarm: 0x%hhX", mfdata.type);
+        new_stat = STAT_START_VIBRATION;
+        goto write_mfdata;
     case ADVTYPE_CLIENT_RESPONSE:
         if (!scanning_resp)
             break;
         ESP_LOGI(TAG, "found client response");
-        app_mainloop_stat = STAT_START_RESPONSE;
-        break;
+        new_stat = STAT_START_RESPONSE;
+        goto write_mfdata;
     default:
         assert(0);
+
+    return;
+
+write_mfdata:
+    
+    if (
+        app_mainloop_stat != STAT_IDLE
+        && app_mainloop_stat != STAT_SCANNING_RESPONSE
+    ){
+        ESP_LOGW(TAG, "mainloop stat changed");
+        return;
+    }
+
+    memcpy(
+        &app_adv_manfacturer_data,
+        &mfdata,
+        sizeof(struct blelib_adv_manfacturer_data)
+    );
+
+    app_mainloop_stat = new_stat;
+
     }
 }
 #endif // CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
@@ -356,6 +379,11 @@ static void app_main_handle_button_event(){
     app_btn_event = UI_BTN_NOEVENT;
 }
 
+static void app_set_mfdata_response(){
+    app_adv_manfacturer_data.type = ADVTYPE_CLIENT_RESPONSE;
+    app_adv_manfacturer_data.encoded_vbat = 0;
+}
+
 /// @brief 更新UI
 static void app_update_ui(){
     ESP_LOGI(TAG, "update ui. page=%d", app_current_page);
@@ -428,6 +456,9 @@ static void app_main_tick(){
             app_main_handle_button_event();
         }
         break;
+
+    // page main
+
     case STAT_HOME_START_TRANSMIT_NORMAL_ALARM:
         blelib_scan_stop();
         APP_SET_ADV_TYPE(ADVTYPE_CLIENT_ALARM);
@@ -472,6 +503,8 @@ static void app_main_tick(){
     case STAT_START_TRANSMIT_RESPONSE:
         app_tick_countdown = COUNTDOWN_TRANSMIT_RESP;
         app_mainloop_stat = STAT_TRANSMITTING_RESPONSE;
+        app_set_mfdata_response();
+        blelib_adv_start(&app_adv_manfacturer_data, 0);
         break;
     case STAT_TRANSMITTING_RESPONSE:
         if (IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP) && app_tick_countdown){
@@ -480,6 +513,26 @@ static void app_main_tick(){
         app_tick_countdown = 0;
         app_mainloop_stat = STAT_IDLE;
         break;
+
+    case STAT_START_VIBRATION:
+        app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
+        app_mainloop_stat = STAT_VIBRATING;
+        blelib_scan_stop();
+        break;
+    case STAT_VIBRATING:
+        if (app_tick_countdown){
+            break;
+        }
+        blelib_adv_stop();
+        app_mainloop_stat = (app_adv_manfacturer_data.type & 0x80)
+            ? STAT_START_RESPONSE
+            : STAT_IDLE
+        ;
+        break;
+    case STAT_START_RESPONSE:
+    case STAT_SENDING_RESPONSE:
+
+    // page settings
 
     case STAT_SETTINGS_SWITCH_NEXT_ITEM:
         break;
@@ -495,9 +548,9 @@ static void app_main_tick(){
     case STAT_SETTINGSUNIT_RETURN:
         break;
 
-    default:
-        ESP_LOGE(TAG, "invalid mainloop stat: %d", app_mainloop_stat);
-        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    //default:
+    //    ESP_LOGE(TAG, "invalid mainloop stat: %d", app_mainloop_stat);
+    //    ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
 }
 

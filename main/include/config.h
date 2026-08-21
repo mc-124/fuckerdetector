@@ -105,6 +105,9 @@ static_assert(
 
 static_assert(sizeof(long)==sizeof(int), "size error");
 
+#define APP_CLIENT_MAIN_SCANHDL_STACK_SIZE 6000
+#define APP_CLIENT_MAIN_SCANHDL_PRIORITY 3
+
 // ADC 读取电池 1/2 分压后电压
 #define CHAN_VBAT   ADC_CHANNEL_1
 
