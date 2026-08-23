@@ -121,7 +121,7 @@ static void cmd_addsleep(uint8_t argc, const char **args){
     uint8_t start_hour, start_minute, start_second = 0;
     uint8_t end_hour, end_minute, end_second = 0;
 
-    uint32_t endi = 0;
+    unsigned int endi = 0;
     if (sscanf(args[0], "%hhu:%hhu:%hhu%n", &start_hour, &start_minute, &start_second, &endi)<2
         ||start_hour>=24||start_minute>=60||start_second>=60
         ||args[0][endi]!=0

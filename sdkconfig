@@ -822,8 +822,8 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # FuckerDetector config
 #
-# CONFIG_APP_SERVER is not set
-CONFIG_APP_CLIENT=y
+CONFIG_APP_SERVER=y
+# CONFIG_APP_CLIENT is not set
 
 #
 # 杂项
