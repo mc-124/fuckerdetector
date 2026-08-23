@@ -5,10 +5,13 @@
 
 #if CONFIG_APP_CLIENT
 
+//extern const uint8_t ui_font_wqy12_cn[];
+//extern const uint8_t u8g2_font_5x7_tf[1612];
+
 enum ui_btn_event {
     UI_BTN_NOEVENT,
     UI_BTN_SINGLE_CLICK,
-    UI_BTN_DOUBLE_CLICK,
+    //UI_BTN_DOUBLE_CLICK,
     UI_BTN_LONGPRESS_START,
     UI_BTN_LONGPRESS_END
 };
@@ -36,6 +39,7 @@ struct ui_alarmdev {
 struct ui_respdev {
     uint16_t short_mac;
     int8_t rssi;
+    uint8_t __reserved;
 };
 
 extern uint8_t ui_self_mac_address[6];
@@ -44,7 +48,7 @@ extern char ui_self_mac_string[5];
 void ui_add_alarmdev(const struct ui_alarmdev *dev);
 void ui_clear_resp_list();
 void ui_add_resp_dev(struct ui_respdev dev);
-uint16_t ui_get_short_mac(uint8_t mac[6]);
+uint16_t ui_get_short_mac(const uint8_t mac[6]);
 
 void ui_init_buttons(ui_btn_callback_t callback);
 void ui_init();

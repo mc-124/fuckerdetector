@@ -49,7 +49,7 @@ struct settings {
     uint8_t vib_loud_num:7; // 强力震动 震动次数 (0-127)+1
     uint8_t vib_loud_dur; // 强力震动 震动时间（20ms）(0-255)+1 10ms-5120ms 
     uint8_t vib_loud_itv; // 强力震动 震动间隔（20ms）(0-255)+1 10ms-5120ms
-    uint8_t server_alarm_as_power:1; // 把探测端警告视为强力警告
+    uint8_t server_alarm_as_loud:1; // 把探测端警告视为强力警告
     uint8_t vib_loud_pwr:7; // 强力震动 震动功率 1-100
 };
 
@@ -67,13 +67,21 @@ extern struct settings settings;
 extern const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM];
 
 DISABLE_TYPELIMIT_START
-inline bool settings_field_is_valid(uint8_t index){
+static inline bool settings_field_is_valid(uint8_t index){
     return (0<=index&&index<SETTINGS_SET_NUM);
 }
 DISABLE_TYPELIMIT_END
 
-bool settings_field_is_bool(const struct settings_config_desc *desc);
-uint32_t settings_get_field_display_value(const struct settings_config_desc *desc, uint8_t value);
+static inline uint32_t settings_get_field_display_value(const struct settings_config_desc *desc, uint8_t value){
+    assert(desc);
+    return (value+desc->display_offset)*desc->display_mul;
+}
+
+static inline bool settings_field_is_bool(const struct settings_config_desc *desc){
+    assert(desc);
+    return desc->display_offset==0&&desc->display_mul==1&&desc->min_value==0&&desc->max_value==1;
+}
+
 uint8_t settings_displayvalue_to_rawvalue(const struct settings_config_desc *desc, uint32_t display_value);
 void settings_print_field(const struct settings_config_desc *desc, uint8_t value);
 bool settings_human_rw(uint8_t index, bool is_w, uint8_t *value);

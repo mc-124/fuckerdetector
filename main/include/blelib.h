@@ -30,12 +30,6 @@ inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/1
 #define APP_BLE_NAME CONFIG_APP_CLIENT_BLE_NAME
 #endif
 
-//#define BLELIB_ADV_PAYLOAD_SIZE (\
-//    (1+1) /* Flags */ \
-//    +(1+sizeof(APP_BLE_NAME)-1) /* Name */ \
-//    +(1+sizeof(struct blelib_adv_manfacturer_data)) /* ManfacturerData */ \
-//)
-
 #pragma pack(1)
 struct blelib_adv_manfacturer_data {
     uint16_t company_id;

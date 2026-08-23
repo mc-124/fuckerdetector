@@ -224,7 +224,7 @@ const static struct settings settings_default = {
     .vib_loud_num = 2,
     .vib_loud_dur = MS_TO_VIB(1500),
     .vib_loud_itv = MS_TO_VIB(800),
-    .server_alarm_as_power = true,
+    .server_alarm_as_loud = false,
     .vib_loud_pwr = 70-1,
 };
 static_assert(sizeof(struct settings)==8);
@@ -243,18 +243,104 @@ static_assert(sizeof(struct settings)==8);
 #define TEXT_B 
 
 const struct settings_config_desc settings_config_list[SETTINGS_SET_NUM] = {
-    {"Receive server alarm", "接收探测器警告", 0,1,0,1},
-    {"Receive client alarm", "接收客户端警告", 0,1,0,1},
-    {"Receive client loud alarm", "接收客户端强力", 0,1,0,1},
-    {"Server alarm as loud alarm", "探测器使用强力", 0,1,0,1},
-    {"Normal alarm vibration number", "警告震动次数", 1,1,0,127},
-    {"Normal alarm vibration duration (ms)", "警告震动时长", 1,20,0,127},
-    {"Normal alarm vibration interval (ms)", "警告震动间隔", 1,20,0,127},
-    {"Normal alarm vibration power", "警告震动功率", 0,1,1,100},
-    {"Violance alarm vibration number", "强力震动次数", 1,1,0,127},
-    {"Violance alarm vibration duration (ms)", "强力震动时长", 1,20,0,127},
-    {"Violance alarm vibration interval (ms)", "强力震动间隔", 1,20,0,127},
-    {"Violance alarm vibration power", "强力震动功率", 0,1,1,100}    
+    // min_value: <=
+    // max_value: >=
+    {
+        "Receive server alarm",
+        "接收探测器警告",
+        0,
+        1,
+        0,
+        1
+    },
+    {
+        "Receive client alarm",
+        "接收客户端警告",
+        0,
+        1,
+        0,
+        1
+    },
+    {
+        "Receive client loud alarm",
+        "接收客户端强力",
+        0,
+        1,
+        0,
+        1
+    },
+    {
+        "Server alarm as loud alarm",
+        "探测器使用强力",
+        0,
+        1,
+        0,
+        1
+    },
+    {
+        "Normal alarm vibration number",
+        "警告震动次数",
+        1,
+        1,
+        0,
+        127
+    },
+    {
+        "Normal alarm vibration duration (ms)",
+        "警告震动时长",
+        1,
+        20,
+        0,
+        127
+    },
+    {
+        "Normal alarm vibration interval (ms)",
+        "警告震动间隔",
+        1,
+        20,
+        0,
+        127
+    },
+    {
+        "Normal alarm vibration power",
+        "警告震动功率",
+        0,
+        1,
+        1,
+        100
+    },
+    {
+        "Violance alarm vibration number",
+        "强力震动次数", 
+        1,
+        1,
+        0,
+        127
+    },
+    {
+        "Violance alarm vibration duration (ms)",
+        "强力震动时长",
+        1,
+        20,
+        0
+        ,127
+    },
+    {
+        "Violance alarm vibration interval (ms)",
+        "强力震动间隔",
+        1,
+        20,
+        0,
+        127
+    },
+    {
+        "Violance alarm vibration power",
+        "强力震动功率",
+        0,
+        1,
+        1,
+        100
+    }    
 };
 
 void settings_init(){
@@ -309,11 +395,6 @@ void settings_store(){
     ESP_ERROR_CHECK(nvs_commit(ns_h));
 }
 
-bool settings_field_is_bool(const struct settings_config_desc *desc){
-    assert(desc);
-    return desc->display_offset==0&&desc->display_mul==1&&desc->min_value==0&&desc->max_value==1;
-}
-
 #define __X_CASE(__index, __fieldname, __min, __max) \
     case __index:       \
     do {                \
@@ -339,7 +420,7 @@ DISABLE_TYPELIMIT_START
         __X_CASE(0, enable_recv_server_alarm, 0, 1); 
         __X_CASE(1, enable_recv_client_alarm, 0, 1);
         __X_CASE(2, enable_recv_client_loud_alarm, 0, 1);
-        __X_CASE(3, server_alarm_as_power, 0, 1);
+        __X_CASE(3, server_alarm_as_loud, 0, 1);
         __X_CASE(4, vib_normal_num, 0, 127);
         __X_CASE(5, vib_normal_dur, 0, 127);
         __X_CASE(6, vib_normal_itv, 0, 127);
@@ -355,11 +436,6 @@ DISABLE_TYPELIMIT_START
 DISABLE_TYPELIMIT_END
 }
 #undef __X_CASE
-
-uint32_t settings_get_field_display_value(const struct settings_config_desc *desc, uint8_t value){
-    assert(desc);
-    return (value+desc->display_offset)*desc->display_mul;
-}
 
 void settings_print_field(const struct settings_config_desc *desc, uint8_t value){
     assert(desc);

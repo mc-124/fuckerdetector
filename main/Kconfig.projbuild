@@ -38,7 +38,7 @@ menu "FuckerDetector config"
             bool "允许发送客户端警报"
             default y
 
-        config APP_CLIENT_TX_LOUDALARM
+        config APP_CLIENT_TX_CLIENTLOUD
             bool "允许发送客户端强力警报"
             default y
         
@@ -46,7 +46,7 @@ menu "FuckerDetector config"
             bool "允许接收客户端警报"
             default y 
 
-        config APP_CLIENT_RX_LOUDALARM
+        config APP_CLIENT_RX_CLIENTLOUD
             bool "允许接收客户端强力警报"
             default y 
 
@@ -58,7 +58,7 @@ menu "FuckerDetector config"
         config APP_CLIENT_RX_CLIENTRESP
             bool "允许接收客户端响应"
             default y 
-            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
 
         # ble
 
@@ -70,25 +70,25 @@ menu "FuckerDetector config"
             int "最大广告间隔 (ms)"
             range 20 10240
             default 128
-            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
         
         config APP_CLIENT_ADV_ITVL_MIN
             int "最小广告间隔 (ms)"
             range 20 10240
             default 32
-            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
 
         config APP_CLIENT_SCAN_ITVL
             int "扫描间隔 (ms)"
             range 20 10240
             default 96
-            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_LOUDALARM
+            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_CLIENTLOUD
 
         config APP_CLIENT_SCAN_WINDOW
             int "扫描窗口 (ms)"
             range 20 10240
             default 48
-            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_LOUDALARM
+            depends on APP_CLIENT_RX_SERVERALARM || APP_CLIENT_RX_CLIENTALARM || APP_CLIENT_RX_CLIENTLOUD
 
         # times
 
@@ -96,19 +96,19 @@ menu "FuckerDetector config"
             int "发送警告广告包持续时间 (ms)"
             range 500 10000
             default 1500
-            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
         
         config APP_CLIENT_TRANSMIT_ALARM_INTERVAL
             int "发送警告广告包后的冷却期 (ms)"
             range 1 10000
             default 1000
-            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
 
         config APP_CLIENT_TRANSMIT_RESP_DURATION
             int "发送响应广告包持续时间 (ms)"
             range 500 10000
             default 1500
-            depends on APP_CLIENT_TX_CLIENTRESP || APP_CLIENT_TX_LOUDALARM
+            depends on APP_CLIENT_TX_CLIENTRESP || APP_CLIENT_TX_CLIENTLOUD
 
         config APP_CLIENT_SCAN_RESP_DURATION
             int "扫描响应广告包持续时间 (ms)"
@@ -132,6 +132,11 @@ menu "FuckerDetector config"
             int "主循环 TPS （设置 0 则无等待）"
             default 20
             range 1 1000
+
+        config APP_CLIENT_VIBRATIOR_STACK_SIZE
+            int "震动控制任务栈大小 (bytes)"
+            default 3072
+            range 0 131072
 
     endmenu
 

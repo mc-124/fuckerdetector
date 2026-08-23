@@ -170,6 +170,7 @@ void blelib_adv_init(){
 }
 
 void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_time){
+    //ESP_LOGW(TAG, "ADV START");
     if (!data){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
     }
@@ -248,6 +249,7 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
 }
 
 void blelib_adv_stop(){
+    //ESP_LOGW(TAG, "ADV STOP");
     ESP_LOGI(TAG, "stop adv");
     esp_err_t ret = ble_gap_ext_adv_stop(BLELIB_ADV_INSTANCE);
     if (ret==BLE_HS_EALREADY){
@@ -277,6 +279,7 @@ void blelib_scan_set_callback(const blelib_scan_disc_callback_t func){
 }
 
 void blelib_scan_start(uint32_t scan_time){
+    //ESP_LOGW(TAG, "SCAN START");
     if (scan_time>=0xffff*10){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_ARG);
     }
@@ -304,6 +307,7 @@ void blelib_scan_start(uint32_t scan_time){
 }
 
 void blelib_scan_stop(){
+    //ESP_LOGW(TAG, "SCAN STOP");
     esp_err_t ret = ble_gap_disc_cancel();
     if (ret){
         ESP_LOGE(TAG, "cannot stop scan: %d", ret);

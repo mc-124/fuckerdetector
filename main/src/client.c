@@ -17,16 +17,14 @@ static const char *TAG = "main";
 /*
     main:
         single -> transmit alarm
-        double -> transmit loud alarm
+        single x2 -> transmit loud alarm
         long -> begin settings
     settings:
         single -> next
-        double -> entry
         long -> return
     settingsunit:
         single -> click
-        double -> next
-        long -> return
+        long -> next button
 */
 
 enum app_uipage {
@@ -41,39 +39,36 @@ enum app_tick_stat {
 
     // page main
 
-    STAT_HOME_START_TRANSMIT_NORMAL_ALARM, // -> STAT_TRANSMITTING_ALARM
-    STAT_HOME_START_TRANSMIT_LOUD_ALARM, // -> STAT_TRANSMITTING_ALARM
+    STAT_HOME_READY_TRANSMIT,
+    STAT_HOME_WAIT_SECOND_BUTTON,
     STAT_HOME_SWITCH_TO_SETTINGS,
 
     STAT_TRANSMITTING_ALARM,
     STAT_SCANNING_RESPONSE,
 
-    STAT_START_TRANSMIT_RESPONSE,
-    STAT_TRANSMITTING_RESPONSE,
-
     STAT_START_VIBRATION,
-    STAT_VIBRATING,
-
     STAT_START_RESPONSE,
     STAT_SENDING_RESPONSE,
+    STAT_WAIT_VIBRATION_STOP,
+
+    STAT_FOUND_RESPONSE,
 
     // page settings
 
     STAT_SETTINGS_SWITCH_NEXT_ITEM,
     STAT_SETTINGS_ENTRY_ITEM,
-    STAT_SETTINGS_RETURN,
 
     // page settingsunit
 
     STAT_SETTINGSUNIT_CLICK_BUTTON,
     STAT_SETTINGSUNIT_SWITCH_NEXT_BUTTON,
-    STAT_SETTINGSUNIT_RETURN,
 };
 
 #define APP_UI_UPDATE_DURATION 30000
 
 // 按钮事件
-static enum ui_btn_event app_btn_event = 0;
+// 会在 `app_handle_button_event` 中被自动重置
+static enum ui_btn_event app_btn_event = UI_BTN_NOEVENT;
 // 页索引
 static enum app_uipage app_current_page = PAGE_HOME;
 // 主循环节拍状态机标志
@@ -87,8 +82,9 @@ static uint32_t app_ui_settings_index = 0;
 
 static uint32_t app_ui_settingsunit_button_index = 0;
 
-/// @todo
-static SemaphoreHandle_t app_lock = NULL;
+static const struct settings_config_desc *app_ui_settings_desc = NULL;
+
+static struct ui_alarmdev app_thisdev = {0};
 
 static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
     .company_id = CONFIG_APP_BLE_COMPANY_ID,
@@ -97,29 +93,118 @@ static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
     .protocol_ver = CONFIG_APP_BLE_PROTOCOL_VER
 };
 
-static inline void app_lock_get(){
-    assert(app_lock);
-    xSemaphoreTake(app_lock, portMAX_DELAY);
-}
-
-static inline void app_lock_put(){
-    assert(app_lock);
-    xSemaphoreGive(app_lock);
-}
-
 #define APP_SET_ADV_TYPE(__type) do {app_adv_manfacturer_data.type = __type; } while (0)
 #define APP_START_ADV() do {blelib_adv_start(&app_adv_manfacturer_data, 0); } while (0)
 
 #define MS_TO_TICKS(__ms) ((uint32_t)(__ms/APP_MAINLOOP_DELAY))
 
+#define COUNTDOWN_READY_ALARM (MS_TO_TICKS(500))
 #define COUNTDOWN_TRANSMIT_ALARM (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_DURATION))
 #define COUNTDOWN_SCAN_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_SCAN_RESP_DURATION))
 #define COUNTDOWN_TRANSMIT_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
 #define COUNTDOWN_ALARM_ITVL (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_INTERVAL))
+#define COUNTDOWN_START_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
 
 #define COUNTDOWN_IDLE_UPDATE_UI (MS_TO_TICKS(CONFIG_APP_CLIENT_IDLE_UPDATE_UI_INTERVAL))
 
-#if CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
+static TaskHandle_t app_htask_vibrator = NULL;
+bool app_vibrator_working = false;
+
+/// @brief 震动控制任务
+static void app_taskfunc_vibrator([[maybe_unused]] void*){
+    uint32_t is_loud = 0;
+    uint32_t vib_dur = 0;
+    uint32_t vib_itv = 0;
+    uint32_t vib_num = 0;
+    uint32_t vib_pwr = 0;
+
+    ESP_LOGD(TAG, "vibratir task running");
+
+    const struct settings_config_desc *const desc_normal_num = &settings_config_list[4];
+    const struct settings_config_desc *const desc_normal_dur = &settings_config_list[5];
+    const struct settings_config_desc *const desc_normal_itv = &settings_config_list[6];
+    const struct settings_config_desc *const desc_normal_pwr = &settings_config_list[7];
+    
+    const struct settings_config_desc *const desc_loud_num = &settings_config_list[8];
+    const struct settings_config_desc *const desc_loud_dur = &settings_config_list[9];
+    const struct settings_config_desc *const desc_loud_itv = &settings_config_list[10];
+    const struct settings_config_desc *const desc_loud_pwr = &settings_config_list[11];
+
+    for (;;){
+        xTaskNotifyWait(0, 0, &is_loud, portMAX_DELAY);
+        app_vibrator_working = true;
+
+        if (is_loud){
+            ESP_LOGD(TAG, "vibrator: loud");
+            vib_num = settings_get_field_display_value(
+                desc_loud_num,
+                settings.vib_loud_num
+            );
+            vib_dur = settings_get_field_display_value(
+                desc_loud_dur,
+                settings.vib_loud_dur
+            );
+            vib_itv = settings_get_field_display_value(
+                desc_loud_itv,
+                settings.vib_loud_itv
+            );
+            vib_pwr = settings_get_field_display_value(
+                desc_loud_pwr,
+                settings.vib_loud_pwr
+            );
+        } else {
+            ESP_LOGD(TAG, "vibrator: normal");
+            vib_num = settings_get_field_display_value(
+                desc_normal_num,
+                settings.vib_normal_num
+            );
+            vib_dur = settings_get_field_display_value(
+                desc_normal_dur,
+                settings.vib_normal_dur
+            );
+            vib_itv = settings_get_field_display_value(
+                desc_normal_itv,
+                settings.vib_normal_itv
+            );
+            vib_pwr = settings_get_field_display_value(
+                desc_normal_pwr,
+                settings.vib_normal_pwr
+            );
+        }
+
+        ESP_LOGD(
+            TAG,
+            "vibrator: d=%u i=%u n=%u p=%u",
+            U32 vib_dur,
+            U32 vib_itv,
+            U32 vib_num,
+            U32 vib_pwr
+        );
+
+        for (int i=0; i<vib_num; i++){
+            misc_vibration_set(vib_pwr);
+            misc_delay_ms(vib_dur);
+            misc_vibration_set(0);
+            misc_delay_ms(vib_itv);
+        }
+
+        ESP_LOGD(TAG, "vibrator: stop");
+        app_vibrator_working = false;
+    }
+}
+
+static void app_set_vibration(bool is_loud){
+    assert(app_htask_vibrator);
+    if (is_loud){
+        ESP_LOGD(TAG, "set vibration: loud");
+    } else {
+        ESP_LOGD(TAG, "set vibration: normal");
+    }
+    uint32_t u32 = is_loud;
+    xTaskNotify(app_htask_vibrator, u32, eSetValueWithOverwrite);
+}
+
+#if APP_RX_ALARM
 
 /// @brief 检查 blelib_adv_manfacturer_data 有效性
 static bool app_is_valid_mfdata(const struct blelib_adv_manfacturer_data *mfdata){
@@ -130,9 +215,21 @@ static bool app_is_valid_mfdata(const struct blelib_adv_manfacturer_data *mfdata
         || mfdata->protocol_ver != CONFIG_APP_BLE_PROTOCOL_VER
         || (mfdata->type & 0x80 && mfdata->encoded_vbat)
         || (
-            mfdata->type != ADVTYPE_SERVER_ALARM
-            && mfdata->type != ADVTYPE_CLIENT_ALARM
-            && mfdata->type != ADVTYPE_CLIENT_LOUD
+            (
+                mfdata->type != ADVTYPE_SERVER_ALARM
+                || !IS_ENABLED(CONFIG_APP_CLIENT_RX_SERVERALARM)
+                || !settings.enable_recv_server_alarm
+            )
+            && (
+                mfdata->type != ADVTYPE_CLIENT_ALARM
+                || !IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTALARM)
+                || !settings.enable_recv_client_alarm
+            )
+            && (
+                mfdata->type != ADVTYPE_CLIENT_LOUD
+                || !IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTLOUD)
+                || !settings.enable_recv_client_loud_alarm
+            )
             && (
                 !IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
                 || mfdata->type != ADVTYPE_CLIENT_RESPONSE
@@ -149,18 +246,23 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
         IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)
         && app_mainloop_stat == STAT_SCANNING_RESPONSE
     );
-    
-    if (
-        app_current_page != PAGE_HOME
-        || (
-            app_mainloop_stat != STAT_IDLE
+
+    if (!(
+            app_current_page == PAGE_HOME
+            && app_mainloop_stat == STAT_IDLE
             && !scanning_resp
         )
-    ){
+        && !(
+            app_current_page == PAGE_TRANSMITTING
+            && app_mainloop_stat == STAT_SCANNING_RESPONSE
+            && scanning_resp
+        )
+    ){;
         return;
     }
 
     if (d->data_status != BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE){
+        ESP_LOGD(TAG, "inv: bad data");
         return;
     }
 
@@ -200,12 +302,17 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
         }
     }
     if (!found_flags || !found_name || !found_mfdata){
+        ESP_LOGD(TAG, "inv: loss field");
+        return;
+    }
+    if (cur_ptr != d->data + d->length_data){
+        ESP_LOGD(TAG, "inv: bad struct");
         return;
     }
 
     enum app_tick_stat new_stat = 0;
 
-    switch (mfdata.type){ /// @todo
+    switch (mfdata.type){
     case ADVTYPE_SERVER_ALARM:
         [[fallthrough]];
     case ADVTYPE_CLIENT_ALARM:
@@ -219,15 +326,16 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
     case ADVTYPE_CLIENT_RESPONSE:
         if (!scanning_resp)
             break;
-        ESP_LOGI(TAG, "found client response");
-        new_stat = STAT_START_RESPONSE;
+        ESP_LOGI(TAG, "found response");
+        new_stat = STAT_FOUND_RESPONSE;
         goto write_mfdata;
     default:
         assert(0);
-
+    }
     return;
 
 write_mfdata:
+    ESP_LOGD(TAG, "valid adv");
     
     if (
         app_mainloop_stat != STAT_IDLE
@@ -243,25 +351,34 @@ write_mfdata:
         sizeof(struct blelib_adv_manfacturer_data)
     );
 
-    app_mainloop_stat = new_stat;
-
+    memcpy(&app_thisdev.short_mac, d->addr.val, 6);
+    app_thisdev.alarm_type = mfdata.type;
+    if (mfdata.type & 0x80){ // client
+        app_thisdev.data.alarm_id = mfdata.data.adv_id;
+        app_thisdev.time.recv_time_s = get_seconds();
+    } else {
+        app_thisdev.data.alarm_id = 0;
+        app_thisdev.time.day_sec = mfdata.data.day_sec;
     }
+    app_thisdev.rssi = d->rssi;
+
+    app_mainloop_stat = new_stat;
 }
 #endif // CONFIG_APP_CLIENT_RX_SERVERALARM || CONFIG_APP_CLIENT_RX_CLIENTALARM
 
 /// @brief 生成并设置广告 ID
 /// 广告 ID 值域：(0x0, 0xffffffff]
 static void app_generate_and_set_adv_id(){
-#if CONFIG_APP_CLIENT_TX_CLIENTRESP
-    uint32_t n = esp_random();
-    if (!n){
-        n = 1;
+    if (IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)){
+        uint32_t n = esp_random();
+        if (!n){
+            n = 1;
+        }
+        ESP_LOGD(TAG, "adv_id = %X", n);
+        app_adv_manfacturer_data.data.adv_id = n;
+    } else {
+        app_adv_manfacturer_data.data.adv_id = 0;
     }
-    ESP_LOGI(TAG, "adv_id = %X", n);
-    app_adv_manfacturer_data.data.adv_id = n;
-#else
-    app_adv_manfacturer_data.data.adv_id = 0;
-#endif
 }
 
 /// @brief 按钮事件回调函数
@@ -277,16 +394,13 @@ static void app_btn_callback([[maybe_unused]] void *phbutton, void* u32event){
     }
     switch ((enum ui_btn_event)u32event){
     case UI_BTN_SINGLE_CLICK:
-        ESP_LOGI(TAG, "btn: single click");
-        break;
-    case UI_BTN_DOUBLE_CLICK:
-        ESP_LOGI(TAG, "btn: double click");
+        ESP_LOGD(TAG, "btn: single click");
         break;
     case UI_BTN_LONGPRESS_START:
-        ESP_LOGI(TAG, "btn: longpress start");
+        ESP_LOGD(TAG, "btn: longpress start");
         break;
     case UI_BTN_LONGPRESS_END:
-        ESP_LOGI(TAG, "btn: longpress end");
+        ESP_LOGD(TAG, "btn: longpress end");
         break;
     case UI_BTN_NOEVENT: // 不可能的值
         [[fallthrough]];
@@ -297,28 +411,20 @@ static void app_btn_callback([[maybe_unused]] void *phbutton, void* u32event){
     app_btn_event = (enum ui_btn_event)u32event;
 }
 
-/// @brief 处理按钮事件，并转换为状态机状态
-static void app_main_handle_button_event(){
-    ESP_LOGI(TAG, "handle button event: p=%d e=%d", app_current_page, app_btn_event);
+/// @brief 处理按钮事件，并转换为状态机状态，最后清空 app_btn_event
+static void app_handle_button_event(){
+    ESP_LOGD(TAG, "handle button event: p=%d e=%d", app_current_page, app_btn_event);
     switch (app_current_page){
     case PAGE_HOME:
         switch (app_btn_event){
         case UI_BTN_SINGLE_CLICK:
-            ESP_LOGI(TAG, "transmit normal alarm");
-            if (app_tick_countdown){
+            ESP_LOGD(TAG, "transmit normal alarm");
+            if (app_tick_countdown)
                 break;
-            }
-            app_mainloop_stat = STAT_HOME_START_TRANSMIT_NORMAL_ALARM;
-            break;
-        case UI_BTN_DOUBLE_CLICK:
-            ESP_LOGI(TAG, "transmit loud alarm");
-            if (app_tick_countdown){
-                break;
-            }
-            app_mainloop_stat = STAT_HOME_START_TRANSMIT_LOUD_ALARM;
+            app_mainloop_stat = STAT_HOME_READY_TRANSMIT;
             break;
         case UI_BTN_LONGPRESS_START:
-            ESP_LOGI(TAG, "switch to settings");
+            ESP_LOGD(TAG, "switch to settings");
             app_mainloop_stat = STAT_HOME_SWITCH_TO_SETTINGS;
             break;
         case UI_BTN_LONGPRESS_END:
@@ -331,16 +437,12 @@ static void app_main_handle_button_event(){
     case PAGE_SETTINGS:
         switch (app_btn_event){
         case UI_BTN_SINGLE_CLICK:
-            ESP_LOGI(TAG, "switch next item");
+            ESP_LOGD(TAG, "switch next item");
             app_mainloop_stat = STAT_SETTINGS_SWITCH_NEXT_ITEM;
             break;
-        case UI_BTN_DOUBLE_CLICK:
-            ESP_LOGI(TAG, "entry item");
-            app_mainloop_stat = STAT_SETTINGS_ENTRY_ITEM;
-            break;
         case UI_BTN_LONGPRESS_START:
-            ESP_LOGI(TAG, "return to page home");
-            app_mainloop_stat = STAT_SETTINGS_RETURN;
+            ESP_LOGD(TAG, "entry item");
+            app_mainloop_stat = STAT_SETTINGS_ENTRY_ITEM;
             break;
         case UI_BTN_LONGPRESS_END:
             break;
@@ -352,16 +454,12 @@ static void app_main_handle_button_event(){
     case PAGE_SETTINGSUNIT:
         switch (app_btn_event){
         case UI_BTN_SINGLE_CLICK:
-            ESP_LOGI(TAG, "click button");
+            ESP_LOGD(TAG, "click button");
             app_mainloop_stat = STAT_SETTINGSUNIT_CLICK_BUTTON;
             break;
-        case UI_BTN_DOUBLE_CLICK:
-            ESP_LOGI(TAG, "switch next button");
-            app_mainloop_stat = STAT_SETTINGSUNIT_SWITCH_NEXT_BUTTON;
-            break;
         case UI_BTN_LONGPRESS_START:
-            ESP_LOGI(TAG, "return to page settings");
-            app_mainloop_stat = STAT_SETTINGSUNIT_RETURN;
+            ESP_LOGD(TAG, "switch next button");
+            app_mainloop_stat = STAT_SETTINGSUNIT_SWITCH_NEXT_BUTTON;
             break;
         case UI_BTN_LONGPRESS_END:
             break;
@@ -379,30 +477,28 @@ static void app_main_handle_button_event(){
     app_btn_event = UI_BTN_NOEVENT;
 }
 
-static void app_set_mfdata_response(){
-    app_adv_manfacturer_data.type = ADVTYPE_CLIENT_RESPONSE;
-    app_adv_manfacturer_data.encoded_vbat = 0;
-}
-
 /// @brief 更新UI
 static void app_update_ui(){
-    ESP_LOGI(TAG, "update ui. page=%d", app_current_page);
     app_idle_update_ui_countdown = COUNTDOWN_IDLE_UPDATE_UI;
 
     switch (app_current_page){
     case PAGE_HOME:
+        ESP_LOGD(TAG, "update ui: PAGE_HOME");
         ui_showpage_home();
         break;
     case PAGE_SETTINGS:
+        ESP_LOGD(TAG, "update ui: PAGE_SETTINGS");
         ui_showpage_settings(app_ui_settings_index);
         break;
     case PAGE_SETTINGSUNIT:
+        ESP_LOGD(TAG, "update ui: PAGE_SETTINGSUNIT");
         ui_showpage_settingsunit(
-            app_ui_settingsunit_button_index, 
-            app_ui_settings_index
+            app_ui_settings_index, 
+            app_ui_settingsunit_button_index
         );
         break;
     case PAGE_TRANSMITTING:
+        ESP_LOGD(TAG, "update ui: PAGE_TRANSMITTING");
         ui_showpage_transmitting();
         break;
     default:
@@ -421,8 +517,11 @@ static void app_switch_page(enum app_uipage page){
         break;
     case PAGE_SETTINGS:
         app_ui_settingsunit_button_index = 0;
+        app_ui_settings_desc = NULL;
         break;
     case PAGE_SETTINGSUNIT:
+        app_ui_settingsunit_button_index = 0;
+        app_ui_settings_desc = &settings_config_list[app_ui_settings_index];
         break;
     case PAGE_TRANSMITTING:
         break;
@@ -434,129 +533,273 @@ static void app_switch_page(enum app_uipage page){
     app_update_ui();
 }
 
+/// @brief 处理 settingsunit 页面的按钮按下
+static void app_settingsunit_click_button(){
+    assert(app_ui_settings_desc);
+
+    uint8_t cur_value;
+
+    if (!settings_human_rw(app_ui_settings_index, false, &cur_value)){
+        ESP_LOGE(TAG, "invalid settings index: %d", app_ui_settings_index);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    }
+
+    if (settings_field_is_bool(app_ui_settings_desc)){
+        if (app_ui_settingsunit_button_index == 0)
+            cur_value = !cur_value;
+        else
+            goto button_return;
+    } else
+        switch (app_ui_settingsunit_button_index){
+        case 0: // add
+            if (cur_value < app_ui_settings_desc->max_value)
+                cur_value++;
+            else
+                return;
+            break;
+        case 1: // sub
+            if (cur_value > app_ui_settings_desc->min_value)
+                cur_value--;
+            else
+                return;
+            break;
+        default: // return
+            button_return:
+            app_mainloop_stat = STAT_IDLE;
+            app_switch_page(PAGE_SETTINGS);
+            return;
+        }
+
+    settings_human_rw(app_ui_settings_index, true, &cur_value);
+    app_update_ui();
+}
+
 /// @brief 主循环节拍状态机
 static void app_main_tick(){
-    if (app_idle_update_ui_countdown){
+    if (app_idle_update_ui_countdown)
         app_idle_update_ui_countdown--;
-    }
-    if (app_tick_countdown){
+
+    if (app_tick_countdown)
         app_tick_countdown--;
-    }
 
     switch (app_mainloop_stat) {
     case STAT_IDLE:
-        if (app_idle_update_ui_countdown==0){
+        if (app_idle_update_ui_countdown==0)
             app_update_ui();
-        }
-        if (app_tick_countdown){
+
+        if (app_tick_countdown)
             // 发送冷却期
             break;
-        }
-        if (app_btn_event != UI_BTN_NOEVENT){
-            app_main_handle_button_event();
-        }
+
+        if (app_btn_event != UI_BTN_NOEVENT)
+            app_handle_button_event();
+        
         break;
 
     // page main
 
-    case STAT_HOME_START_TRANSMIT_NORMAL_ALARM:
-        blelib_scan_stop();
+    case STAT_HOME_READY_TRANSMIT:
+        ESP_LOGD(TAG, "STAT_HOME_READY_TRANSMIT");
+        led(1);
+        app_mainloop_stat = STAT_HOME_WAIT_SECOND_BUTTON;
+        app_tick_countdown = COUNTDOWN_READY_ALARM;
+        app_btn_event = UI_BTN_NOEVENT;
+        break;
+    case STAT_HOME_WAIT_SECOND_BUTTON:
+        if (app_btn_event == UI_BTN_SINGLE_CLICK){
+            // double click
+            ESP_LOGD(TAG, "transmit loud alarm");
+            APP_SET_ADV_TYPE(ADVTYPE_CLIENT_LOUD);
+            app_tick_countdown = 0;
+            goto start_transmit_alarm;
+        }
+        
+        if (app_btn_event != UI_BTN_NOEVENT){
+            ESP_LOGW(TAG, "invalid button event: %d", app_btn_event);
+            app_btn_event = UI_BTN_NOEVENT;
+            break;
+        }
+        if (app_tick_countdown)
+            break;
+        
+        ESP_LOGD(TAG, "transmit normal alarm");
         APP_SET_ADV_TYPE(ADVTYPE_CLIENT_ALARM);
-        app_generate_and_set_adv_id();
-        APP_START_ADV();
-        app_switch_page(PAGE_TRANSMITTING);
-        app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
-        app_mainloop_stat = STAT_TRANSMITTING_ALARM;
-        break;
-    case STAT_HOME_START_TRANSMIT_LOUD_ALARM:
+        
+    start_transmit_alarm:
+        ui_clear_resp_list();
+        app_btn_event = UI_BTN_NOEVENT;
         blelib_scan_stop();
-        APP_SET_ADV_TYPE(ADVTYPE_CLIENT_LOUD);
         app_generate_and_set_adv_id();
         APP_START_ADV();
         app_switch_page(PAGE_TRANSMITTING);
         app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
         app_mainloop_stat = STAT_TRANSMITTING_ALARM;
         break;
+
     case STAT_HOME_SWITCH_TO_SETTINGS:
+        ESP_LOGD(TAG, "STAT_HOME_SWITCH_TO_SETTINGS");
         app_switch_page(PAGE_SETTINGS);
+        blelib_scan_stop();
         app_mainloop_stat = STAT_IDLE;
         break;
     
     case STAT_TRANSMITTING_ALARM:
-        if (app_tick_countdown){
+        if (app_tick_countdown)
             break;
-        }
+        ESP_LOGD(TAG, "STAT_TRANSMITTING_ALARM");
         blelib_adv_stop();
+        if (IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP)){
+            app_mainloop_stat = STAT_SCANNING_RESPONSE;
+            app_tick_countdown = COUNTDOWN_SCAN_RESP;
+        } else {
+            goto transmit_alarm_end;
+        }
         blelib_scan_start(0);
-        app_mainloop_stat = STAT_SCANNING_RESPONSE;
-        app_tick_countdown = COUNTDOWN_SCAN_RESP;
         break;
     case STAT_SCANNING_RESPONSE:
-        if (IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP) && app_tick_countdown){
+        if (!IS_ENABLED(CONFIG_APP_CLIENT_RX_CLIENTRESP))
+            goto invalid_state;
+        if (app_tick_countdown)
             break;
-        }
+        ESP_LOGD(TAG, "STAT_SCANNING_RESPONSE");
+    transmit_alarm_end:
         app_mainloop_stat = STAT_IDLE;
+        app_btn_event = UI_BTN_NOEVENT;
         app_tick_countdown = COUNTDOWN_ALARM_ITVL;
+        led(0);
         app_switch_page(PAGE_HOME);
-        break;
-        
-    case STAT_START_TRANSMIT_RESPONSE:
-        app_tick_countdown = COUNTDOWN_TRANSMIT_RESP;
-        app_mainloop_stat = STAT_TRANSMITTING_RESPONSE;
-        app_set_mfdata_response();
-        blelib_adv_start(&app_adv_manfacturer_data, 0);
-        break;
-    case STAT_TRANSMITTING_RESPONSE:
-        if (IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP) && app_tick_countdown){
-            break;
-        }
-        app_tick_countdown = 0;
-        app_mainloop_stat = STAT_IDLE;
         break;
 
     case STAT_START_VIBRATION:
-        app_tick_countdown = COUNTDOWN_TRANSMIT_ALARM;
-        app_mainloop_stat = STAT_VIBRATING;
-        blelib_scan_stop();
-        break;
-    case STAT_VIBRATING:
-        if (app_tick_countdown){
-            break;
+        ESP_LOGD(TAG, "STAT_START_VIBRATION");
+        do {
+            bool is_loud;
+
+            ESP_LOGD(TAG, "adv type: %hhu", app_adv_manfacturer_data.type);
+
+            if (app_adv_manfacturer_data.type == ADVTYPE_SERVER_ALARM){
+                is_loud = settings.server_alarm_as_loud;
+            } else if (app_adv_manfacturer_data.type == ADVTYPE_CLIENT_ALARM){
+                is_loud = false;
+            } else if (app_adv_manfacturer_data.type == ADVTYPE_CLIENT_LOUD){
+                is_loud = true;
+            } else {
+                ESP_LOGE(
+                    TAG,
+                    "invalid type for vibration: %hhu",
+                    app_adv_manfacturer_data.type
+                );
+                ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+                assert(0);
+            }
+            app_set_vibration(is_loud);
+        } while (0);
+
+        led(1);
+        
+        if (
+            IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP)
+            && app_adv_manfacturer_data.type & 0x80
+        ){
+            app_mainloop_stat = STAT_START_RESPONSE;
+            blelib_scan_stop();
+        } else {
+            app_mainloop_stat = STAT_WAIT_VIBRATION_STOP;
         }
-        blelib_adv_stop();
-        app_mainloop_stat = (app_adv_manfacturer_data.type & 0x80)
-            ? STAT_START_RESPONSE
-            : STAT_IDLE
-        ;
         break;
     case STAT_START_RESPONSE:
+        if (!IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP))
+            goto invalid_state;
+        ESP_LOGD(TAG, "STAT_START_RESPONSE");
+        app_tick_countdown = COUNTDOWN_START_RESP;
+        app_mainloop_stat = STAT_SENDING_RESPONSE;
+        app_adv_manfacturer_data.encoded_vbat = 0;
+        app_adv_manfacturer_data.type = ADVTYPE_CLIENT_RESPONSE;
+        ui_add_alarmdev(&app_thisdev);
+        app_update_ui();
+        blelib_adv_start(&app_adv_manfacturer_data, 0);
+        break;
     case STAT_SENDING_RESPONSE:
+        if (!IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP))
+            goto invalid_state;
+        if (app_tick_countdown)
+            break;
+        ESP_LOGD(TAG, "STAT_SENDING_RESPONSE");
+        blelib_adv_stop();
+        app_mainloop_stat = STAT_WAIT_VIBRATION_STOP;
+        break;
+    case STAT_WAIT_VIBRATION_STOP:
+        if (app_vibrator_working)
+            break;
+        ESP_LOGD(TAG, "STAT_WAIT_VIBRATION_STOP");
+        app_mainloop_stat = STAT_IDLE;
+        led(0);
+        blelib_scan_start(0);
+        break;
+    case STAT_FOUND_RESPONSE:
+        ESP_LOGD(TAG, "STAT_FOUND_RESPONSE");
+        app_mainloop_stat = STAT_SCANNING_RESPONSE;
+        ui_add_resp_dev(*((struct ui_respdev*)&app_thisdev));
+        app_update_ui();
+        break;
 
     // page settings
 
     case STAT_SETTINGS_SWITCH_NEXT_ITEM:
+        ESP_LOGD(TAG, "STAT_SETTINGS_SWITCH_NEXT_ITEM");
+        if (app_ui_settings_index == 12)
+            app_ui_settings_index = 0;
+        else
+            app_ui_settings_index++;
+        app_mainloop_stat = STAT_IDLE;
+        app_update_ui();
         break;
     case STAT_SETTINGS_ENTRY_ITEM:
+        ESP_LOGD(TAG, "STAT_SETTINGS_ENTRY_ITEM");
+        if (app_ui_settings_index == 12){
+            app_switch_page(PAGE_HOME);
+            blelib_scan_start(0);
+            settings_store();
+        } else {
+            app_switch_page(PAGE_SETTINGSUNIT);
+        }
+        app_mainloop_stat = STAT_IDLE;
         break;
-    case STAT_SETTINGS_RETURN:
-        break;
+
+    // page settingsunit
 
     case STAT_SETTINGSUNIT_CLICK_BUTTON:
+        ESP_LOGD(TAG, "STAT_SETTINGSUNIT_CLICK_BUTTON");
+        app_settingsunit_click_button();
+        app_mainloop_stat = STAT_IDLE;
         break;
     case STAT_SETTINGSUNIT_SWITCH_NEXT_BUTTON:
-        break;
-    case STAT_SETTINGSUNIT_RETURN:
+        ESP_LOGD(TAG, "STAT_SETTINGSUNIT_SWITCH_NEXT_BUTTON");
+        if (settings_field_is_bool(app_ui_settings_desc)){
+            app_ui_settingsunit_button_index = !app_ui_settingsunit_button_index;
+        } else {
+            if (app_ui_settingsunit_button_index == 2)
+                app_ui_settingsunit_button_index = 0;
+            else
+                app_ui_settingsunit_button_index++;
+        }
+        app_mainloop_stat = STAT_IDLE;
+        app_update_ui();
         break;
 
-    //default:
-    //    ESP_LOGE(TAG, "invalid mainloop stat: %d", app_mainloop_stat);
-    //    ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    default:
+    invalid_state:
+        ESP_LOGE(TAG, "invalid mainloop stat: %d", app_mainloop_stat);
+        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
 }
 
 /// @brief 初始化
 static void app_init(){
-    ESP_LOGI(TAG, FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
+    ESP_LOGI(
+        TAG,
+        FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION
+    );
 
     misc_gpio_init(
         PIN_OUTPUT, 
@@ -593,27 +836,50 @@ static void app_init(){
         repl_begin();
     }
 
+    UBaseType_t rc = xTaskCreate(
+        app_taskfunc_vibrator,
+        "vibrator",
+        CONFIG_APP_CLIENT_VIBRATIOR_STACK_SIZE,
+        NULL,
+        1,
+        &app_htask_vibrator
+    );
+
+    if (rc != pdTRUE){
+        ESP_LOGE(TAG, "create task failed (%d): vibrator", rc);
+        ESP_ERROR_CHECK(ESP_FAIL);
+    }
+
     blelib_scan_set_callback(app_scan_callback);
+    ui_init_buttons(app_btn_callback);
     
     ui_init();
 }
 
 void app_main(){
     app_init();
-    ESP_LOGI(TAG, "end of init");
+    ESP_LOGD(TAG, "end of init");
+
+    led(1);
 
     // 开机画面
     ui_showpage_launch();
+
+    led(0);
+
     ui_showpage_home();
 
-#if APP_MAINLOOP_DELAY
-    TickType_t tick_count = xTaskGetTickCount();
-#endif // APP_MAINLOOP_DELAY
+    TickType_t tick_count = APP_MAINLOOP_DELAY
+        ? xTaskGetTickCount()
+        : 0
+    ;
+
+    blelib_scan_start(0);
 
     for(;;){
-#if APP_MAINLOOP_DELAY
-        vTaskDelayUntil(&tick_count, pdMS_TO_TICKS(APP_MAINLOOP_DELAY));
-#endif // APP_MAINLOOP_DELAY
+        if(APP_MAINLOOP_DELAY)
+            vTaskDelayUntil(&tick_count, pdMS_TO_TICKS(APP_MAINLOOP_DELAY));
+
         app_main_tick();
     }
 }

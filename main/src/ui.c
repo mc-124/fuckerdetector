@@ -17,8 +17,9 @@
 #include "u8g2.h"
 #include "u8x8.h"
 
-#define FONT_0 u8g2_font_wqy12_t_chinese1
-#define FONT_1 u8g2_font_5x7_tf
+extern const uint8_t ui_font_wqy12_cn[];
+static const uint8_t* FONT_0 = ui_font_wqy12_cn;
+static const uint8_t* FONT_1 = u8g2_font_5x7_tf;
 
 static const char *TAG = "ui";
 
@@ -52,7 +53,6 @@ static const button_config_t btn_cfg = {
     .long_press_time = 640,
 };
 
-
 static const button_gpio_config_t btn_gpio_cfg = {
     .gpio_num = PIN_FUNCT,
     .active_level = 0,
@@ -61,8 +61,6 @@ static const button_gpio_config_t btn_gpio_cfg = {
 };
 
 static button_handle_t btn_h = {0};
-
-static ui_btn_callback_t ui_btn_callbacks[4] = {0};
 
 #define ui_ringbuf_indexadd(__u8Index, __u8Add) ((__u8Index+__u8Add)%UI_MAX_DISPLAY_DEV_NUM)
 #define ui_ringbuf_indexdec() ui_alarmdev_ringbuf_start = (ui_alarmdev_ringbuf_start==0 ? UI_MAX_DISPLAY_DEV_NUM-1 : ui_alarmdev_ringbuf_start - 1)
@@ -121,12 +119,16 @@ void ui_clear_resp_list(){
 
 void ui_add_resp_dev(struct ui_respdev dev){
     ESP_LOGI(TAG, "add resp dev: [%04hX] %hhddBm", dev.short_mac, dev.rssi);
+    for (int i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
+        if (dev.short_mac == ui_respdev_list[i].short_mac)
+            return;
+    }
     if (ui_respdev_list_len<=UI_MAX_DISPLAY_DEV_NUM){
         ui_respdev_list[ui_respdev_list_len++] = dev;
     }
 }
 
-uint16_t ui_get_short_mac(uint8_t mac[6]){
+uint16_t ui_get_short_mac(const uint8_t mac[6]){
     return esp_crc32_le(0xCC114514, mac, 6) % 0xffff;
 }
 
@@ -144,13 +146,14 @@ void ui_init_buttons(ui_btn_callback_t callback){
         callback,
         (void*)UI_BTN_SINGLE_CLICK
     ));
-    ESP_ERROR_CHECK(iot_button_register_cb(
-        btn_h, 
-        BUTTON_DOUBLE_CLICK, 
-        NULL, 
-        callback, 
-        (void*)UI_BTN_DOUBLE_CLICK
-    ));
+    // 不知道为啥捕捉不到双击 放弃了
+    //ESP_ERROR_CHECK(iot_button_register_cb(
+    //    btn_h, 
+    //    BUTTON_DOUBLE_CLICK, 
+    //    NULL, 
+    //    callback, 
+    //    (void*)UI_BTN_DOUBLE_CLICK
+    //));
     ESP_ERROR_CHECK(iot_button_register_cb(
         btn_h, 
         BUTTON_LONG_PRESS_START, 
@@ -167,7 +170,7 @@ void ui_init_buttons(ui_btn_callback_t callback){
     ));
 }
 
-static void ui_oled_invert(bool en){
+[[maybe_unused]] static void ui_oled_invert(bool en){
     uint8_t cmd = en?0x06:0x07;
     //ESP_ERROR_CHECK(i2c_master_write_to_device(I2C_NUM_0, PERI_SSD1306_ADDR, &cmd, 1, pdMS_TO_TICKS(100)));
     ESP_ERROR_CHECK(i2c_master_transmit(ctx.dev_handle, &cmd, 1, 100));
@@ -175,11 +178,16 @@ static void ui_oled_invert(bool en){
 
 static inline void ui_clear(){
     u8g2_ClearBuffer(oled);
+    u8g2_SetDrawColor(oled, 1);
 }
 
 static inline void ui_update(){
     ESP_LOGI(TAG, "updating ui");
     u8g2_SendBuffer(oled);
+}
+
+static inline void ui_reset_text_color(){
+    u8g2_SetDrawColor(oled, 1);
 }
 
 void ui_init(){
@@ -211,25 +219,29 @@ void ui_showpage_launch(){
     ESP_LOGI(TAG, "showpage: launch");
     ui_clear();
     ui_setfont(FONT_0);
-    ui_oled_invert(true);
     uint8_t y = ui_get_txt_center_y(3);
     
     // title
-    u8g2_DrawStr(oled, ui_get_en_center_x(14), y, "FuckerDetector");
+    u8g2_DrawUTF8(oled, ui_get_en_center_x(14), y, "FuckerDetector");
     y += 12;
     // version
-    u8g2_DrawStr(oled, ui_get_en_center_x(14)+8, y, "V: " FIRMWARE_VERSION);
+    u8g2_DrawUTF8(
+        oled,
+        ui_get_en_center_x(14)+8,
+        y,
+        "V: "
+        FIRMWARE_VER_TYPE_SHORT "-" FIRMWARE_VERSION
+    );
     y += 12;
     // address
     char buf[10];
     snprintf(buf, sizeof(buf), "A: [%s]", ui_self_mac_string);
-    u8g2_DrawStr(oled, ui_get_en_center_x(14)+8, y, buf);
+    u8g2_DrawUTF8(oled, ui_get_en_center_x(14)+8, y, buf);
 
     ui_update();
     misc_vibration_set(10);
     misc_delay_ms(1000);
     misc_vibration_set(0);
-    ui_oled_invert(false);
 }
 
 // 显示主页
@@ -238,15 +250,16 @@ void ui_showpage_home(){
     ui_clear();
     ui_setfont(FONT_1);
     char buf[21];
-    uint8_t y = 0;
+    // FONT_1(5x7) 字形顶部位于 baseline-6
+    uint8_t y = 6;
     snprintf(buf, sizeof(buf), "SCANNING [%s]%4.2fV", ui_self_mac_string, misc_vbat_read());
-    u8g2_DrawStr(oled, 0, y, buf);
+    u8g2_DrawUTF8(oled, 0, y, buf);
     for (int i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
         const struct ui_alarmdev *this = ui_get_alarmdev(i);
         y += 8;
         if (this){
             ui_alarmdev_to_line(this, buf);
-            u8g2_DrawStr(oled, 0, y, buf);
+            u8g2_DrawUTF8(oled, 0, y, buf);
         }
     }
     ui_update();
@@ -255,13 +268,13 @@ void ui_showpage_home(){
 // 高亮行（FONT_0）：开始
 static void ui_white_line_start(uint8_t y){
     u8g2_SetDrawColor(oled, 1);
-    u8g2_DrawBox(oled, 0, y, 127, y+12);
+    u8g2_DrawBox(oled, 0, y-11, 127, 12);
     u8g2_SetDrawColor(oled, 0);
 }
 // 高亮行（FONT_1）：开始
 static void ui_white_line_start_font1(uint8_t y){
     u8g2_SetDrawColor(oled, 1);
-    u8g2_DrawBox(oled, 0, y, 127, y+8);
+    u8g2_DrawBox(oled, 0, y-6, 127, 8);
     u8g2_SetDrawColor(oled, 0);
 }
 // 高亮行：结束
@@ -269,57 +282,62 @@ static void ui_white_line_end(){
     u8g2_SetDrawColor(oled, 1);
 }
 
-#define __X_DRAWLINE(__u8LineIndex)         \
-    do {                                    \
-        uint8_t y = __u8LineIndex*12+16;    \
-        if (pagebtn_index==__u8LineIndex)   \
-            ui_white_line_start(y);         \
-        u8g2_DrawStr(oled, 0, y, desc->name_zh);    \
-        if (pagebtn_index==__u8LineIndex)   \
-            ui_white_line_end();            \
-    } while (0)
+static inline void ui_settings_drawbutton(int cur_index, int self_index){
+    int y = (self_index%4)*12+16+11;
+    const struct settings_config_desc *desc = &settings_config_list[self_index];
+    ESP_LOGD(
+        TAG,
+        "ui_settings_drawbutton(%d, %d) -> %s",
+        cur_index,
+        self_index,
+        desc->name_zh
+    );
+    if (cur_index == self_index)
+        ui_white_line_start(y);
+    u8g2_DrawUTF8(oled, 0, y, desc->name_zh);
+    if (cur_index == self_index)
+        ui_white_line_end();
+}
 
 /// @brief 显示页面：设置列表
 /// @param settings_index 设置索引
-/// @note 当 `settings_index` == 12 时，将会显示“信息”页面
+/// @note 当 `settings_index` == 12 时，将会显示“信息”页面 范围[0,12]
 void ui_showpage_settings(uint8_t settings_index){
     ESP_LOGI(TAG, "showpage: settings[%hhu]", settings_index);
     ui_clear();
     ui_setfont(FONT_0);
     uint8_t subpage_index = settings_index / 4;
     uint8_t pagebtn_index = settings_index % 4;
-    const struct settings_config_desc *desc = NULL;
-    if (subpage_index<3){
-        desc = &settings_config_list[settings_index];
-    }
+    // FONT_0(wqy12) 字形顶部位于 baseline-11
+    uint8_t title_y = 11;
     switch (subpage_index){
     case 0:
-        u8g2_DrawStr(oled, ui_get_zh_center_x(4), 0, "设置 1/4");
-        __X_DRAWLINE(0);
-        __X_DRAWLINE(1);
-        __X_DRAWLINE(2);
-        __X_DRAWLINE(3);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(4), title_y, "设置 1/4");
+        ui_settings_drawbutton(settings_index, 0);
+        ui_settings_drawbutton(settings_index, 1);
+        ui_settings_drawbutton(settings_index, 2);
+        ui_settings_drawbutton(settings_index, 3);
         break;
     case 1:
-        u8g2_DrawStr(oled, ui_get_zh_center_x(4), 0, "设置 2/4");
-        __X_DRAWLINE(0);
-        __X_DRAWLINE(1);
-        __X_DRAWLINE(2);
-        __X_DRAWLINE(3);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(4), title_y, "设置 2/4");
+        ui_settings_drawbutton(settings_index, 4);
+        ui_settings_drawbutton(settings_index, 5);
+        ui_settings_drawbutton(settings_index, 6);
+        ui_settings_drawbutton(settings_index, 7);
         break;
     case 2:
-        u8g2_DrawStr(oled, ui_get_zh_center_x(4), 0, "设置 3/4");
-        __X_DRAWLINE(0);
-        __X_DRAWLINE(1);
-        __X_DRAWLINE(2);
-        __X_DRAWLINE(3);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(4), title_y, "设置 3/4");
+        ui_settings_drawbutton(settings_index, 8);
+        ui_settings_drawbutton(settings_index, 9);
+        ui_settings_drawbutton(settings_index, 10);
+        ui_settings_drawbutton(settings_index, 11);
         break;
     case 3:
-        u8g2_DrawStr(oled, ui_get_zh_center_x(4), 0, "设置 4/4");
-        u8g2_DrawStr(oled, 0, 16, "版本: " FIRMWARE_VER_TYPE_SHORT "-" FIRMWARE_VERSION);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(4), title_y, "设置 4/4");
+        u8g2_DrawUTF8(oled, 0, 27, "版本: " FIRMWARE_VER_TYPE_SHORT "-" FIRMWARE_VERSION);
     
-        ui_white_line_start(0);
-        u8g2_DrawStr(oled, ui_get_zh_center_x(2), 52, "退出");
+        ui_white_line_start(52);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(2), 52, "退出");
         ui_white_line_end();
         break;
     default:
@@ -332,7 +350,7 @@ void ui_showpage_settings(uint8_t settings_index){
 
 /// @brief 显示页面：设置单元
 /// @param settings_index 设置索引
-/// @param button_index 设置单元按钮索引
+/// @param button_index 设置单元按钮索引 范围[0, 2]
 void ui_showpage_settingsunit(uint8_t settings_index, uint8_t button_index){
     ESP_LOGI(TAG, "showpage: settingsunit[%hhu:%hhu]", settings_index, button_index);
     if (settings_index>=SETTINGS_SET_NUM){
@@ -344,29 +362,57 @@ void ui_showpage_settingsunit(uint8_t settings_index, uint8_t button_index){
 
     const struct settings_config_desc *desc = &settings_config_list[settings_index];
 
-    u8g2_DrawStr(oled, ui_get_zh_center_x(2), 0, "编辑");
-    u8g2_DrawStr(oled, 0, 12, settings_config_list[settings_index].name_zh);
+    u8g2_DrawUTF8(oled, 0, 11, "编辑:");
+    u8g2_DrawUTF8(oled, 32, 11, settings_config_list[settings_index].name_zh);
+
+    uint8_t cur_val;
+    assert(settings_human_rw(settings_index, false, &cur_val));
 
     if (settings_field_is_bool(desc)){
-        uint8_t cur_val;
-        settings_human_rw(settings_index, false, &cur_val);
-        ui_white_line_start(28);
-        u8g2_DrawStr(oled, ui_get_zh_center_x(1), 28, cur_val ? "开" : "关");
-        ui_white_line_end();
+        u8g2_DrawUTF8(oled, 0, 23, ">");
+        u8g2_DrawUTF8(oled, 116, 23, cur_val ? "是" : "否");
+
+        if (button_index == 0)
+            ui_white_line_start(52);
+        u8g2_DrawUTF8(
+            oled,
+            ui_get_zh_center_x(1),
+            52,
+            cur_val ? "否" : "是"
+        );
+        if (button_index == 0)
+            ui_white_line_end();
+
+        if (button_index == 1)
+            ui_white_line_start(64);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(2), 64, "返回");
+        if (button_index == 1)
+            ui_white_line_end();
+        
     } else {
-        uint8_t cur_val;
-        settings_human_rw(button_index, false, &cur_val);
         uint32_t ds_val = settings_get_field_display_value(desc, cur_val);
-        u8g2_DrawStr(oled, 0, 28, ">");
+        u8g2_DrawUTF8(oled, 0, 23, ">");
         char buf[9];
         snprintf(buf, sizeof(buf), "%8u", U32 ds_val);
-        u8g2_DrawStr(oled, 127-(8*6), 28, buf);
-        if (button_index==0) ui_white_line_start(40);
-        u8g2_DrawStr(oled, ui_get_en_center_x(1), 40, "+");
-        if (button_index==0) ui_white_line_end();
-        if (button_index==1) ui_white_line_start(52);
-        u8g2_DrawStr(oled, ui_get_en_center_x(1), 52, "-");
-        if (button_index==1) ui_white_line_end();
+        u8g2_DrawUTF8(oled, 127-(8*6), 23, buf);
+        /////////
+        if (button_index==0) 
+            ui_white_line_start(40);
+        u8g2_DrawUTF8(oled, ui_get_en_center_x(1), 40, "+");
+        if (button_index==0) 
+            ui_white_line_end();
+        /////////
+        if (button_index==1)
+            ui_white_line_start(52);
+        u8g2_DrawUTF8(oled, ui_get_en_center_x(1), 52, "-");
+        if (button_index==1)
+            ui_white_line_end();
+        /////////
+        if (button_index==2)
+            ui_white_line_start(64);
+        u8g2_DrawUTF8(oled, ui_get_zh_center_x(2), 64, "返回");
+        if (button_index==2)
+            ui_white_line_end();
     }
 
     ui_update();
@@ -377,17 +423,17 @@ void ui_showpage_transmitting(){
     ui_clear();
     ui_setfont(FONT_1);
 
-    ui_white_line_start_font1(0);
-    u8g2_DrawStr(oled, ui_get_txt_center_y(15), 0, "TRANSMITTING...");
+    ui_white_line_start_font1(6);
+    u8g2_DrawUTF8(oled, ui_get_en_center_x(15), 6, "TRANSMITTING...");
     ui_white_line_end();
 
-    uint8_t y = 8;
+    uint8_t y = 14;
     char buf[21];
     for (int i=0; i<ui_respdev_list_len; i++){
         struct ui_respdev dev = ui_respdev_list[i];
         if (dev.rssi){
             snprintf(buf, sizeof(buf), "Found [%04hX] %4hhddBm", dev.short_mac, dev.rssi);
-            u8g2_DrawStr(oled, 0, y, buf);
+            u8g2_DrawUTF8(oled, 0, y, buf);
         }
         y += 8;
     }
@@ -418,7 +464,7 @@ void ui_showpage_alarming(uint16_t short_addr, uint8_t alarm_type){
         ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
 
-    u8g2_DrawStr(oled, 0, ui_get_txt_center_y(1), title_buf);
+    u8g2_DrawUTF8(oled, 0, ui_get_txt_center_y(1), title_buf);
     ui_update();
 }
 

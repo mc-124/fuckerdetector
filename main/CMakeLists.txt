@@ -6,6 +6,7 @@ idf_component_register(SRCS
     "src/raderctl.c"
     "src/settings.c"
     "src/ui.c"
+    "src/ui_font_wqy12_cn.c"
     "src/client.c"
     "src/server.c"
     INCLUDE_DIRS "./include")
