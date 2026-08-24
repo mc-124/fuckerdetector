@@ -746,7 +746,8 @@ static void app_main_tick(){
         app_btn_event = UI_BTN_NOEVENT;
         app_mainloop_stat = STAT_IDLE;
         led(0);
-        blelib_scan_start(0);
+        if (app_adv_manfacturer_data.type & 0x80)
+            blelib_scan_start(0);
         break;
         
     case STAT_FOUND_RESPONSE:
