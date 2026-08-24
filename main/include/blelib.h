@@ -19,6 +19,8 @@
 
 #define ADV_IS_CLIENT(__u8Type) (__u8Type & 0x80)
 
+extern uint8_t blelib_addr_val[6];
+
 // encode vbat value range: [2.2, 4.75]
 
 static inline uint8_t blelib_encode_vbat(float vbat) {

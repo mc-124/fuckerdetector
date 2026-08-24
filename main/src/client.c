@@ -328,6 +328,8 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
     case ADVTYPE_CLIENT_RESPONSE:
         if (!scanning_resp)
             break;
+        if (mfdata.data.adv_id != app_adv_manfacturer_data.data.adv_id)
+            break;
         ESP_LOGI(TAG, "found response");
         new_stat = STAT_FOUND_RESPONSE;
         goto write_mfdata;
@@ -420,7 +422,7 @@ static void app_handle_button_event(){
     case PAGE_HOME:
         switch (app_btn_event){
         case UI_BTN_SINGLE_CLICK:
-            ESP_LOGD(TAG, "transmit normal alarm");
+            ESP_LOGD(TAG, "transmit alarm");
             if (app_tick_countdown)
                 break;
             app_mainloop_stat = STAT_HOME_READY_TRANSMIT;
@@ -606,6 +608,7 @@ static void app_main_tick(){
         app_mainloop_stat = STAT_HOME_WAIT_SECOND_BUTTON;
         app_tick_countdown = COUNTDOWN_READY_ALARM;
         app_btn_event = UI_BTN_NOEVENT;
+        app_adv_manfacturer_data.encoded_vbat = 0;
         break;
     case STAT_HOME_WAIT_SECOND_BUTTON:
         if (app_btn_event == UI_BTN_SINGLE_CLICK){

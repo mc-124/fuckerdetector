@@ -40,7 +40,8 @@ static u8g2_t u8g2 = {};
 #define oled (&u8g2)
 #define u8x8 ((u8x8_t*)&u8g2)
 
-uint8_t ui_self_mac_address[6];
+//uint8_t ui_self_mac_address[6];
+#define ui_self_mac_address blelib_addr_val
 char ui_self_mac_string[5];
 #define UI_MAX_DISPLAY_DEV_NUM 7
 static struct ui_alarmdev ui_alarmdev_ringbuf[UI_MAX_DISPLAY_DEV_NUM];
@@ -205,7 +206,7 @@ void ui_init(){
     u8x8_SetI2CAddress(u8x8, PERI_SSD1306_ADDR<<1); // 8bit
     u8g2_InitDisplay(oled);
     u8g2_SetPowerSave(u8x8, 0);
-    esp_read_mac(ui_self_mac_address, ESP_MAC_BT);
+    //esp_read_mac(ui_self_mac_address, ESP_MAC_BT);
     snprintf(ui_self_mac_string, 5, "%04hX", ui_get_short_mac(ui_self_mac_address));
     memset(ui_alarmdev_ringbuf, 0, sizeof(ui_alarmdev_ringbuf));
 }

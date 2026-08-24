@@ -24,8 +24,9 @@
 
 static const char *TAG = "blelib";
 //static QueueHandle_t ble_op_queue = NULL;
-static uint8_t blelib_own_addr_type = 0;
-static uint8_t blelib_addr_val[6] = {0};
+//static uint8_t blelib_own_addr_type = 0;
+#define blelib_own_addr_type BLE_OWN_ADDR_PUBLIC
+uint8_t blelib_addr_val[6] = {0};
 
 static_assert(sizeof(blelib_addr_val)==6, "MAC buffer error");
 
@@ -156,11 +157,12 @@ void blelib_adv_init(){
         ESP_LOGE(TAG, "ensure addr failed: %d", ret);
         ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
     }
-    ret = ble_hs_id_infer_auto(0, &blelib_own_addr_type);
-    if (ret){
-        ESP_LOGE(TAG, "ble_hs_id_infer_auto -> %d", ret);
-        ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
-    }
+    // 从自动获取可用类型改成强制使用 PUBLIC 地址
+    //ret = ble_hs_id_infer_auto(0, &blelib_own_addr_type);
+    //if (ret){
+    //    ESP_LOGE(TAG, "ble_hs_id_infer_auto -> %d", ret);
+    //    ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
+    //}
     ESP_LOGI(TAG, "own addr type = %d", blelib_own_addr_type);
     ret = ble_hs_id_copy_addr(blelib_own_addr_type, blelib_addr_val, NULL);
     if (ret){
