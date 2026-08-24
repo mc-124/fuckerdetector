@@ -104,6 +104,12 @@ menu "FuckerDetector config"
             default 1000
             depends on APP_CLIENT_TX_CLIENTALARM || APP_CLIENT_TX_CLIENTLOUD
 
+        config APP_CLIENT_TRANSMIT_RESP_WAITTIME
+            int "发送响应广告包前的等待时间"
+            range 500 10000
+            default 800
+            depends on APP_CLIENT_TX_CLIENTRESP || APP_CLIENT_TX_CLIENTLOUD
+
         config APP_CLIENT_TRANSMIT_RESP_DURATION
             int "发送响应广告包持续时间 (ms)"
             range 500 10000

@@ -48,6 +48,7 @@ enum app_tick_stat {
 
     STAT_START_VIBRATION,
     STAT_START_RESPONSE,
+    STAT_READY_RESPONSE,
     STAT_SENDING_RESPONSE,
     STAT_WAIT_VIBRATION_STOP,
 
@@ -104,6 +105,7 @@ static struct blelib_adv_manfacturer_data app_adv_manfacturer_data = {
 #define COUNTDOWN_TRANSMIT_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
 #define COUNTDOWN_ALARM_ITVL (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_ALARM_INTERVAL))
 #define COUNTDOWN_START_RESP (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_DURATION))
+#define COUNTDOWN_RESP_WAIT (MS_TO_TICKS(CONFIG_APP_CLIENT_TRANSMIT_RESP_WAITTIME))
 
 #define COUNTDOWN_IDLE_UPDATE_UI (MS_TO_TICKS(CONFIG_APP_CLIENT_IDLE_UPDATE_UI_INTERVAL))
 
@@ -711,6 +713,15 @@ static void app_main_tick(){
         if (!IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP))
             goto invalid_state;
         ESP_LOGD(TAG, "STAT_START_RESPONSE");
+        app_tick_countdown = COUNTDOWN_RESP_WAIT;
+        app_mainloop_stat = STAT_READY_RESPONSE;
+        break;
+    case STAT_READY_RESPONSE:
+        if (!IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP))
+            goto invalid_state;
+        if (app_tick_countdown)
+            break;
+        ESP_LOGD(TAG, "STAT_READY_RESPONSE");
         app_tick_countdown = COUNTDOWN_START_RESP;
         app_mainloop_stat = STAT_SENDING_RESPONSE;
         app_adv_manfacturer_data.encoded_vbat = 0;
@@ -732,10 +743,12 @@ static void app_main_tick(){
         if (app_vibrator_working)
             break;
         ESP_LOGD(TAG, "STAT_WAIT_VIBRATION_STOP");
+        app_btn_event = UI_BTN_NOEVENT;
         app_mainloop_stat = STAT_IDLE;
         led(0);
         blelib_scan_start(0);
         break;
+        
     case STAT_FOUND_RESPONSE:
         ESP_LOGD(TAG, "STAT_FOUND_RESPONSE");
         app_mainloop_stat = STAT_SCANNING_RESPONSE;

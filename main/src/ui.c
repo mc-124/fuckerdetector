@@ -119,7 +119,7 @@ void ui_clear_resp_list(){
 
 void ui_add_resp_dev(struct ui_respdev dev){
     ESP_LOGI(TAG, "add resp dev: [%04hX] %hhddBm", dev.short_mac, dev.rssi);
-    for (int i=0; i<UI_MAX_DISPLAY_DEV_NUM; i++){
+    for (int i=0; i<ui_respdev_list_len; i++){
         if (dev.short_mac == ui_respdev_list[i].short_mac)
             return;
     }
