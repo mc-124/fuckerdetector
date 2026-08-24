@@ -14,7 +14,6 @@
 
 static const char* TAG = "main";
 
-
 void app_init(){
     ESP_LOGI(TAG, FIRMWARE_TYPE_STRING "_" FIRMWARE_VER_TYPE "-" FIRMWARE_VERSION);
 
@@ -92,8 +91,8 @@ static void app_rader_pwron(){
         gpio_deep_sleep_hold_dis();
         gpio_hold_dis(PIN_OUTPUT);
         gpio_set_level(PIN_OUTPUT, 1);
-        app_wait_rader_ready();
     }
+    app_wait_rader_ready();
 }
 
 /// @brief 做好入睡前的准备然后入睡
@@ -112,7 +111,6 @@ static void app_rader_pwron(){
 
 /// @brief 发送警告广告包
 static void app_transmit_alarm(float vbat, int now){
-    uint8_t encoded_vbat = 0;
     static struct blelib_adv_manfacturer_data mfdata = {
         .company_id = CONFIG_APP_BLE_COMPANY_ID,
         .type = ADVTYPE_SERVER_ALARM,
@@ -120,7 +118,7 @@ static void app_transmit_alarm(float vbat, int now){
         .data = {.day_sec = 0},
         CONFIG_APP_BLE_PROTOCOL_VER
     };
-    mfdata.encoded_vbat = encoded_vbat;
+    mfdata.encoded_vbat = blelib_encode_vbat(vbat);
     mfdata.data.day_sec = now;
     blelib_init();
     blelib_adv_init();

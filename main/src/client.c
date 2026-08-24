@@ -359,7 +359,7 @@ write_mfdata:
         app_thisdev.data.alarm_id = mfdata.data.adv_id;
         app_thisdev.time.recv_time_s = get_seconds();
     } else {
-        app_thisdev.data.alarm_id = 0;
+        app_thisdev.data.vbat = blelib_decode_vbat(mfdata.encoded_vbat);
         app_thisdev.time.day_sec = mfdata.data.day_sec;
     }
     app_thisdev.rssi = d->rssi;
@@ -708,6 +708,8 @@ static void app_main_tick(){
         } else {
             app_mainloop_stat = STAT_WAIT_VIBRATION_STOP;
         }
+        ui_add_alarmdev(&app_thisdev);
+        app_update_ui();
         break;
     case STAT_START_RESPONSE:
         if (!IS_ENABLED(CONFIG_APP_CLIENT_TX_CLIENTRESP))
@@ -726,8 +728,6 @@ static void app_main_tick(){
         app_mainloop_stat = STAT_SENDING_RESPONSE;
         app_adv_manfacturer_data.encoded_vbat = 0;
         app_adv_manfacturer_data.type = ADVTYPE_CLIENT_RESPONSE;
-        ui_add_alarmdev(&app_thisdev);
-        app_update_ui();
         blelib_adv_start(&app_adv_manfacturer_data, 0);
         break;
     case STAT_SENDING_RESPONSE:

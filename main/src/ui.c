@@ -73,42 +73,45 @@ static struct ui_alarmdev *ui_get_alarmdev(uint8_t index){
 
 void ui_add_alarmdev(const struct ui_alarmdev *dev){
     assert(dev);
+    struct ui_alarmdev *last = ui_get_alarmdev(0);
+    if (last && last->short_mac == dev->short_mac && last->alarm_type == dev->alarm_type){
+        memcpy(last, dev, sizeof(struct ui_alarmdev));
+        return;
+    }
     ui_ringbuf_indexdec();
     memcpy(&ui_alarmdev_ringbuf[ui_alarmdev_ringbuf_start], dev, sizeof(struct ui_alarmdev));
 }
 
 static void ui_alarmdev_time_to_str(const struct ui_alarmdev *in, char out[6]){
-    if (!ADV_IS_CLIENT(in->alarm_type)){
-        return;
-    }
-    uint32_t diff = ((uint32_t)get_seconds()) - in->time.recv_time_s;
-    uint8_t h = diff / 3600;
-    if (h==0){
-        uint8_t m = diff % 3600 / 60;
-        if (m==0){
-            snprintf(out, 6, "  >1m");
+    if (ADV_IS_CLIENT(in->alarm_type)){
+        uint32_t diff = ((uint32_t)get_seconds()) - in->time.recv_time_s;
+        uint8_t h = diff / 3600;
+        if (h==0){
+            uint8_t m = diff % 3600 / 60;
+            if (m==0)
+                snprintf(out, 6, "  >1m");
+            else 
+                snprintf(out, 6, " %3hhum", m);
+        } else if (h<100){
+            uint8_t m2 = (diff % 3600 / 60)/6;
+            snprintf(out, 6, "%2hhu.%hhuh", h, m2);
         } else {
-            snprintf(out, 6, " %3hhum", m);
+            snprintf(out, 6, " 99h+");
         }
-    } else if (h<100){
-        uint8_t m2 = (diff % 3600 / 60)/6;
-        snprintf(out, 6, "%2hhu.%hhuh", h, m2);
     } else {
-        snprintf(out, 6, " 99h+");
+        int time = in->time.day_sec;
+        uint8_t hour = time / 3600;
+        uint8_t min = (time % 3600) / 60;
+        snprintf(out, 6, "%02hhu:%02hhu", hour, min);
     }
 }
 
-static void ui_alarmdev_to_line(const struct ui_alarmdev *in, char out[21]){
+static void ui_alarmdev_to_line(const struct ui_alarmdev *in, char out[32]){
     snprintf(out, 8, "[%04hX] ", in->short_mac); // 0:7
     ui_alarmdev_time_to_str(in, out+7); // 7:12
-    if (ADV_IS_CLIENT(in->alarm_type)){ // 12:21
-        snprintf(out+12, 9, " %4hhddBm", in->rssi);
-    } else {
-        uint8_t rssi_chr = (-in->rssi)/10;
-        if (rssi_chr>=16){
-            rssi_chr = 15;
-        }
-        snprintf(out+12, 9, "%X %5.2fV", (char)rssi_chr, in->data.vbat);
+    snprintf(out+12, 9, " %4hhddBm", in->rssi);
+    if (!ADV_IS_CLIENT(in->alarm_type)){ 
+        snprintf(out+20, 11, " %4.2fV", in->data.vbat); // 4.35V
     }
 }
 
@@ -249,7 +252,7 @@ void ui_showpage_home(){
     ESP_LOGI(TAG, "showpage: home");
     ui_clear();
     ui_setfont(FONT_1);
-    char buf[21];
+    char buf[32];
     // FONT_1(5x7) 字形顶部位于 baseline-6
     uint8_t y = 6;
     snprintf(buf, sizeof(buf), "SCANNING [%s]%4.2fV", ui_self_mac_string, misc_vbat_read());

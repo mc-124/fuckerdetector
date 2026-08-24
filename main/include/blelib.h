@@ -21,8 +21,22 @@
 
 // encode vbat value range: [2.2, 4.75]
 
-inline uint8_t blelib_encode_vbat(float vbat) {return ((uint8_t)(((int)(vbat*100.0))-220));}
-inline uint8_t blelib_decode_vbat(float vbat) {return((float)(((int)vbat)+220)/100.0);}
+static inline uint8_t blelib_encode_vbat(float vbat) {
+    return (
+        (uint8_t)(
+            (
+                (int)(vbat*100.0f)
+            )-220
+        )
+    );
+}
+static inline float blelib_decode_vbat(uint8_t encoded_vbat) {
+    return(
+        (float)(
+            encoded_vbat+220
+        )/100.0f
+    );
+}
 
 #if CONFIG_APP_SERVER
 #define APP_BLE_NAME CONFIG_APP_SERVER_BLE_NAME
