@@ -194,6 +194,7 @@ void blelib_adv_start(struct blelib_adv_manfacturer_data *data, uint32_t adv_tim
     params.itvl_max = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_ADV_ITVL_MAX);
     params.itvl_min = BLE_GAP_ADV_ITVL_MS(CONFIG_APP_ADV_ITVL_MIN);
     params.tx_power = ESP_PWR_LVL_P20; // +20dbm
+    ESP_ERROR_CHECK(esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P20));
     esp_err_t ret = ble_gap_ext_adv_configure(BLELIB_ADV_INSTANCE, &params, NULL, blelib_event_callback, NULL);
     if (ret){
         ESP_LOGE(TAG, "set adv failed: %d", ret);

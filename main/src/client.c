@@ -316,15 +316,17 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
 
     switch (mfdata.type){
     case ADVTYPE_SERVER_ALARM:
-        [[fallthrough]];
+        if (settings.enable_recv_server_alarm)
+            goto found_alarm;
+        break;
     case ADVTYPE_CLIENT_ALARM:
-        [[fallthrough]];
+        if (settings.enable_recv_client_alarm)
+            goto found_alarm;
+        break;
     case ADVTYPE_CLIENT_LOUD:
-        if (scanning_resp)
-            break;
-        ESP_LOGI(TAG, "found alarm: 0x%hhX", mfdata.type);
-        new_stat = STAT_START_VIBRATION;
-        goto write_mfdata;
+        if (settings.enable_recv_client_loud_alarm)
+            goto found_alarm;
+        break;
     case ADVTYPE_CLIENT_RESPONSE:
         if (!scanning_resp)
             break;
@@ -337,6 +339,12 @@ static void app_scan_callback(const struct ble_gap_ext_disc_desc *d){
         assert(0);
     }
     return;
+
+found_alarm:
+    if (scanning_resp)
+        return;
+    ESP_LOGI(TAG, "found alarm: 0x%hhX", mfdata.type);
+    new_stat = STAT_START_VIBRATION;
 
 write_mfdata:
     ESP_LOGD(TAG, "valid adv");
