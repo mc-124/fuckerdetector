@@ -56,14 +56,25 @@ static const uint8_t RESP_SET_TH[] = {
 
 };
 
+static inline void raderctl_print_buf(uint8_t *buf, int len){
+    for (int i=0; i<len; i++)
+        printf(" %02hhX", buf[i]);
+    println();
+}
+
 static bool raderctl_recv_bytes(uint8_t *buf, uint8_t len){
     uint8_t curlen = 0;
     int64_t start_time = get_millis();
+    memset(buf, 0, len);
+    printf("RADER: >>");
     for (;;){
         curlen += uart_read_bytes(UART_NUM_1, buf+curlen, len-curlen, pdMS_TO_TICKS(50));
         if (curlen==len){
+            raderctl_print_buf(buf, curlen);
             return true;
         } else if (((get_millis())-start_time)>RECV_CMD_TIMEOUT){
+            raderctl_print_buf(buf, curlen);
+            println("Timeout");
             return false;
         }
     }
@@ -81,11 +92,6 @@ static void raderctl_init_rader(){
         if (!memcmp(resp_buf, INST_SET_MOVING_MODE, sizeof(resp_buf))){
             println("success");
             return;
-        } 
-
-        printf("RECEIVED:");
-        for (int i=0; i<sizeof(resp_buf); i++){
-            printf(" %hhX", resp_buf[i]);
         }
         println("error: failed");
     } else {
@@ -103,12 +109,10 @@ static int raderctl_query_th(){
             &&resp_buf[3] == 0xFA // 操作码
             &&!memcmp(INST_QUERY_CONFIG+5, resp_buf+sizeof(resp_buf)-2, 2) // 帧尾
         ){
-            int th = resp_buf[4]<<16 | resp_buf[5]<<8 | resp_buf[6];
+            // example: 3C 3A 19 FA 01 11 00 09 C4 FF 00 0A FF FF FF 08 00 3A 3E 00 00 00 00 3A 3E
+            //                            ^^^^^^^^
+            int th = resp_buf[6]<<16 | resp_buf[7]<<8 | resp_buf[8];
             return th;
-        }
-        printf("RECEIVED:");
-        for (int i=0; i<sizeof(resp_buf); i++){
-            printf(" %hhX", resp_buf[i]);
         }
         println("error: query failed");
         return -1;
