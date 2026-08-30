@@ -200,11 +200,69 @@ static void cmd_savesleep(uint8_t argc, const char **args){
     println("success");
 }
 
+static void cmd_gettime(uint8_t argc, const char **args){
+    if (argc){
+        println("error: invalid arguments");
+        return;
+    }
+    if (timelib_is_lost_time()){
+        println("* RTC lost time");
+    }
+    struct tm time;
+    timelib_get_time(&time);
+    char buf[24];
+    int wrotelen = strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &time);
+    if (!wrotelen){
+        println("error: failed");
+        ESP_LOGE(TAG, "cannot convert time to string");
+        return;
+    }
+    printfln("Time: %s", buf);
+}
+
+static void cmd_settime(uint8_t argc, const char **args){
+    if (!argc){
+        println("Usage: settime <YYYY-mm-dd> <HH:MM:SS>");
+        return;
+    } else if (argc != 2){
+        println("error: invalid arguments");
+        return;
+    }
+    const char *date_str = args[0];
+    const char *time_str = args[1];
+
+    char buf[24];
+    int ret = snprintf(buf, sizeof(buf), "%s %s", date_str, time_str);
+    if (ret <= 0 || ret >= sizeof(buf)){
+        println("error: invalid input");
+        return;
+    }
+
+    struct tm time;
+    char *rp = strptime(buf, "%Y-%m-%d %H:%M:%S", &time);
+    if (!rp){
+        println("error: invalid time (NULL)");
+        return;
+    } else if (*rp != '\0'){
+        printfln("error: invalid time (at %d, '%c')", (rp-buf)+1, *rp);
+        return;
+    }
+    if (timelib_is_lost_time()){
+        ESP_LOGD(TAG, "clear RTC lost time flags");
+        timelib_clear_lost_time();
+    }
+    timelib_set_time(&time);
+    println("success");
+    cmd_gettime(0, NULL);
+}
+
 void settings_addcmds(){
     repl_addcmd("addsleep", "Add sleep interval", cmd_addsleep); // #5
     repl_addcmd("delsleep", "Delete a sleep interval", cmd_delsleep); // #6
     repl_addcmd("lssleep", "Print all sleep interval", cmd_lssleep); // #7
     repl_addcmd("savesleep", "Save all sleep interval", cmd_savesleep); // #8
+    repl_addcmd("gettime", "Get RTC time", cmd_gettime); // #9
+    repl_addcmd("settime", "Set RTC time", cmd_settime); // #10
 }
 
 #elif CONFIG_APP_CLIENT

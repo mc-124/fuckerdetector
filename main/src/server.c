@@ -150,9 +150,12 @@ void app_main(){
     ESP_LOGI(TAG, "vbat: %f", vbat);
     app_check_vbat(vbat);
 
+    if (timelib_is_lost_time()){
+        ESP_LOGW(TAG, "RTC lost time");
+    }
+
     int now = timelib_get_day_sec();
     ESP_LOGI(TAG, "now: %d", now);
-
 
     if (app_wakeup_by_rader()){
         ESP_LOGI(TAG, "wakeup by rader");
